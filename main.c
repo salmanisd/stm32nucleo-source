@@ -95,7 +95,7 @@ void main () {
 	
 	SPI1->CR2|=SPI_CR2_TXDMAEN; //DMA request when TX empty flag set
 	
-	char dma_str[]="hello my name is salman ahmed what is your name it is so nice to meeet you please";
+	char dma_str[]="hello my name is salman ahmed what is your name ...Testing GIT2";
 	
 	
 	//DMA2 STream3
