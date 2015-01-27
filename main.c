@@ -2,6 +2,15 @@
 
 
 /////
+	void ms_delay(int ms) {
+   while (ms-- > 0) {
+      volatile int x=5971;
+      while (x-- > 0)
+         __asm("nop");
+   }
+}
+
+
 int j=6;
  unsigned int SPIsend(unsigned int data)
 {
@@ -50,7 +59,7 @@ int j=6;
 	
 
 void main () {
-
+int dummy=0;
 	//APB2=No predivisor=Max Clock=84Mhz
 	
 	//* Enbale GPIOA clock */
@@ -83,23 +92,40 @@ void main () {
 	GPIOB->OSPEEDR |=set_ospeed(6); 
 	GPIOB->BSRRL|=0x0040;                  //set portB pin6 as output=1,CS Disable (high)
 
+	GPIOA->MODER |= 0X0000000F; //FOR ADC MCU pins PA0 and PA1 set to analog mode
+
 
 	//peripheral clock enable register ,enable SPI1 clock
 	RCC->APB2ENR |=  RCC_APB2ENR_SPI1EN ; 
-
 	
+	//Enable ADC1 clock
+	RCC->APB2ENR |= RCC_APB2ENR_ADC1EN ;                 
+	
+	ADC->CCR|=0x00030000; //ADC Prescaler set to 8 (PCLK2/8) where pclk2 is 84Mhz
+
+	ADC1->SQR3|=0x00000001;
+	ADC1->CR2 |= ADC_CR2_ADON;  //ADC ON
+	ADC1->CR2 |= ADC_CR2_CONT;   //continous conversion until bit cleared
+
+	ADC1->CR2 |=ADC_CR2_SWSTART;	//Start conversion
+	while ((ADC_SR_EOC)==0);  //end of conversion,(EOC=0) not completed
+	
+	
+	
+	
+	
+  SPI1->CR1 |=	SPI_CR1_DFF; //16 bit data frame
 	SPI1->CR1 |=(0x0002<<3); // Baud Rate as  fpclk/8 (10.5Mhz) where fpclk is APB2 clock=84Mhz
 	SPI1->CR1 |= SPI_CR1_SSM ;
 	SPI1->CR1 |= SPI_CR1_SSI;                       
 	SPI1->CR1 |=SPI_CR1_MSTR;						
-	
+		
+		
 	SPI1->CR2|=SPI_CR2_TXDMAEN; //DMA request when TX empty flag set
 	
-	char dma_str[]="hello my name is salman ahmed what is your name ...Testing GIT2";
-	
+	char dma_str[]="Testing SPI and then wireless communication from STM to  CC3200";
 	
 	//DMA2 STream3
-		
 	RCC->AHB1ENR |= RCC_AHB1ENR_DMA2EN;
 		
 		DMA2_Stream3->CR &= 0;
@@ -107,9 +133,9 @@ void main () {
 	
 		DMA2->LISR &= 0;
 		DMA2->HISR &= 0;
-		
+	
 		DMA2_Stream3->PAR |= (uint32_t)&SPI1->DR;
-    DMA2_Stream3->M0AR |= (uint32_t)&dma_str[0];
+    DMA2_Stream3->M0AR |= (uint32_t)&ADC1->DR;//dma_str[0];
 		DMA2_Stream3->NDTR |=0x50;
 		
 		DMA2_Stream3->CR |=(3<<16); //high prority
@@ -118,17 +144,26 @@ void main () {
 		DMA2_Stream3->CR |=(1<<6); //direction
 //DMA2_Stream3->CR |= (1<<5) ; //[perh is flowcontroller
 		
-		DMA2_Stream3->CR |=DMA_SxCR_EN;
+//DMA2_Stream3->CR |=DMA_SxCR_EN;
 	
+
+
+
+
 
 
 //	Enable SPI
 	SPI1->CR1|=SPI_CR1_SPE;
 
 
-
 	GPIOB->BSRRH|=0x0040 ; //CS Enable (low)
+
+while (1){
 	
+ms_delay(500);
+SPIsend(ADC1->DR);
+	  while (SPI1->SR & SPI_SR_BSY);
+}
 /*
 	int j=0;
 	int i=0;
