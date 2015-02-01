@@ -1,6 +1,12 @@
 #include <stm32f4xx.h>
 
-
+void ms_delay(int ms);
+ unsigned int SPIsend(unsigned int data);
+ int set_pin_AF(int p);
+   int AF_sel(int p);
+     int set_ospeed(int p);
+       int set_pulldir(int p);
+   void DMA2_Stream4_IRQHandler(void);
 /////
 	void ms_delay(int ms) {
    while (ms-- > 0) {
@@ -11,7 +17,13 @@
 }
 
 
-int j=6;
+//GLOBAL VARIABLES
+static int j=10;
+short adc_resultA[50];
+short adc_resultB[50];
+
+
+
  unsigned int SPIsend(unsigned int data)
 {
 	int dummy=0;
@@ -56,11 +68,54 @@ int j=6;
 		p=1<<(p*2);
 		return p;
 	}
-	
 
+ 
+
+//void DMA2_Stream4_IRQHandler(void)
+//{
+//HAL_DMA_IRQHandler();
+//}
+__irq void IRQHandler (void);
+
+__irq void IRQHandler ()
+{
+   //volatile unsigned int *base = (unsigned int *) 0x80000000;
+  //   if (*base == 0x000000B4)   
+	//	 {			 // which interrupt was it?
+        TIM3->SR &= ~TIM_SR_UIF; // clear UIF flag
+			ADC1->CR2 |= 0xFFFF; 
+	//	 }   
+    
+	//	if(TIM3->SR & TIM_SR_UIF) // if UIF flag is set	
+		
+}
 void main () {
-int dummy=0;
-	//APB2=No predivisor=Max Clock=84Mhz
+static int dummy=0;
+	
+	//peripheral clock enable register ,enable SPI1 clock
+	RCC->APB2ENR |=  RCC_APB2ENR_SPI1EN ; 
+	
+	//Enable ADC1 clock
+	RCC->APB2ENR |= RCC_APB2ENR_ADC1EN ;                 
+	
+        //DMA2 Clock
+        RCC->AHB1ENR |= RCC_AHB1ENR_DMA2EN;
+	
+	RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;
+
+
+TIM3->PSC = 23999;	        // Set prescaler to 24 000 (PSC + 1)
+TIM3->ARR = 3000;	          // Auto reload value 1000
+TIM3->DIER |= TIM_DIER_UIE; // Enable update interrupt (timer level)
+TIM3->CR1 |= TIM_CR1_CEN;   // Enable timer
+
+
+HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_0);
+HAL_NVIC_SetPriority ( TIM3_IRQn, 0, 0); 
+HAL_NVIC_EnableIRQ (TIM3_IRQn); 
+            
+
+		//APB2=No predivisor=Max Clock=84Mhz
 	
 	//* Enbale GPIOA clock */
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
@@ -95,75 +150,103 @@ int dummy=0;
 	GPIOA->MODER |= 0X0000000F; //FOR ADC MCU pins PA0 and PA1 set to analog mode
 
 
-	//peripheral clock enable register ,enable SPI1 clock
-	RCC->APB2ENR |=  RCC_APB2ENR_SPI1EN ; 
-	
-	//Enable ADC1 clock
-	RCC->APB2ENR |= RCC_APB2ENR_ADC1EN ;                 
-	
+//	GPIOB->BSRRL|=0x0040;                  //CS Disable (high)
+
+
+						
+		//DMA CONFIG FOR ADC
+                DMA2_Stream4->CR &= 0;
+		while ( (DMA2_Stream4->CR !=0));
+                
+		DMA2->LISR &= 0;
+		DMA2->HISR &= 0;
+       
+                DMA2_Stream4->PAR |= (uint32_t)&ADC1->DR;
+                DMA2_Stream4->M0AR |= (uint32_t)&adc_resultA[0];
+                DMA2_Stream4->M1AR |= (uint32_t)&adc_resultB[0];
+                DMA2_Stream4->NDTR |=0x320; //50 x 16 items transfer
+		        
+               //DMA DOUBLE BUFFER
+        //        DMA2_Stream4->CR |= DMA_SxCR_DBM; //Buffer switiching enabeld
+                
+                DMA2_Stream4->CR |=(1<<11);   //Set Peripheral data size to 16bits
+		DMA2_Stream4->CR |=(3<<16); //high prority
+		DMA2_Stream4->CR |=(0<<25); //select channel 0
+                DMA2_Stream4->CR |=DMA_SxCR_CIRC; //circular mode set
+                DMA2_Stream4->CR |=DMA_SxCR_MINC; //memory increment
+							//	DMA2_Stream4->CR |=(1<<6); //direction
+                //DMA2_Stream4->CR |= (1<<5) ; //[perh is flowcontroller
+                 //Emable DMA Stream for ADC
+               DMA2_Stream4->CR |=DMA_SxCR_EN;
+        
+
+               
+        
+        
 	ADC->CCR|=0x00030000; //ADC Prescaler set to 8 (PCLK2/8) where pclk2 is 84Mhz
-
 	ADC1->SQR3|=0x00000001;
+	
 	ADC1->CR2 |= ADC_CR2_ADON;  //ADC ON
-	ADC1->CR2 |= ADC_CR2_CONT;   //continous conversion until bit cleared
-
-	ADC1->CR2 |=ADC_CR2_SWSTART;	//Start conversion
-	while ((ADC_SR_EOC)==0);  //end of conversion,(EOC=0) not completed
+        ADC1->CR2 |= ADC_CR2_CONT;   //continous conversion until bit cleared
+        ADC1->CR2 |=ADC_CR2_DMA; //use DMA for data transfer
+	ADC1->CR2 |=ADC_CR2_DDS; //DMA requests are issued as long as data is converted and DMA=1
+        ADC1->CR2 |=ADC_CR2_SWSTART;	//Start conversion
+        while ((ADC_SR_EOC)==0);  //end of conversion,(EOC=0) not completed
+	
+       
 	
 	
-	
-	
-	
-  SPI1->CR1 |=	SPI_CR1_DFF; //16 bit data frame
+        SPI1->CR1 |=SPI_CR1_DFF; //16 bit data frame
 	SPI1->CR1 |=(0x0002<<3); // Baud Rate as  fpclk/8 (10.5Mhz) where fpclk is APB2 clock=84Mhz
-	SPI1->CR1 |= SPI_CR1_SSM ;
-	SPI1->CR1 |= SPI_CR1_SSI;                       
+		//	SPI1->CR1 |= SPI_CR1_SSM ;
+		//	SPI1->CR1 |= SPI_CR1_SSI;                       
 	SPI1->CR1 |=SPI_CR1_MSTR;						
 		
-		
 	SPI1->CR2|=SPI_CR2_TXDMAEN; //DMA request when TX empty flag set
+	SPI1->CR2|=   SPI_CR2_SSOE;
 	
 	char dma_str[]="Testing SPI and then wireless communication from STM to  CC3200";
 	
-	//DMA2 STream3
-	RCC->AHB1ENR |= RCC_AHB1ENR_DMA2EN;
+             
 		
 		DMA2_Stream3->CR &= 0;
 		while ( (DMA2_Stream3->CR !=0));
 	
-		DMA2->LISR &= 0;
-		DMA2->HISR &= 0;
-	
+                //DMA CONFIG for SPI
 		DMA2_Stream3->PAR |= (uint32_t)&SPI1->DR;
-    DMA2_Stream3->M0AR |= (uint32_t)&ADC1->DR;//dma_str[0];
-		DMA2_Stream3->NDTR |=0x50;
+                DMA2_Stream3->M0AR |= (uint32_t)&adc_resultA[0];//dma_str[0];
+		DMA2_Stream3->NDTR |=0x10;
 		
+		DMA2_Stream3->CR |=(1<<11);   //Set Peripheral data size to 16bits
 		DMA2_Stream3->CR |=(3<<16); //high prority
-		DMA2_Stream3->CR |=(3<<25); //select channel 3
-		DMA2_Stream3->CR |=DMA_SxCR_MINC;
+		DMA2_Stream3->CR |=(3<<25); //select channel 3         
+		//	DMA2_Stream3->CR |=DMA_SxCR_MINC;
+		DMA2_Stream3->CR |=DMA_SxCR_CIRC; //circular mode set for SPI
 		DMA2_Stream3->CR |=(1<<6); //direction
-//DMA2_Stream3->CR |= (1<<5) ; //[perh is flowcontroller
+		//      DMA2_Stream3->CR |= (1<<5) ; //[perh is flowcontroller
 		
-//DMA2_Stream3->CR |=DMA_SxCR_EN;
+         
+                //Emable DMA Stream for SPI
+              DMA2_Stream3->CR |=DMA_SxCR_EN;
 	
-
-
-
-
-
 
 //	Enable SPI
 	SPI1->CR1|=SPI_CR1_SPE;
+        
 
+  //  GPIOB->BSRRH|=0x0040 ; //CS Enable (low)
 
-	GPIOB->BSRRH|=0x0040 ; //CS Enable (low)
-
+	
+/*
 while (1){
 	
 ms_delay(500);
+    
+
 SPIsend(ADC1->DR);
 	  while (SPI1->SR & SPI_SR_BSY);
-}
+
+}*/
 /*
 	int j=0;
 	int i=0;
@@ -177,9 +260,16 @@ SPIsend(ADC1->DR);
 */
 
 //	GPIOB->BSRRL|=0x0040;                  //CS Disable (high)
-
-
-
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 while(1);
 
 
