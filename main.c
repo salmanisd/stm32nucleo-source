@@ -1,14 +1,20 @@
 #include <stm32f4xx.h>
 
+//Prototypes
 void ms_delay(int ms);
- unsigned int SPIsend(unsigned int data);
- int set_pin_AF(int p);
-   int AF_sel(int p);
-     int set_ospeed(int p);
-       int set_pulldir(int p);
-   void DMA2_Stream4_IRQHandler(void);
-/////
-	void ms_delay(int ms) {
+unsigned int SPIsend(unsigned int data);
+int set_pin_AF(int p);
+int AF_sel(int p);
+int set_ospeed(int p);
+int set_pulldir(int p);
+
+__irq void DMA2_Stream4_IRQHandler(void);
+__irq void DMA2_Stream3_IRQHandler(void);
+
+
+
+
+void ms_delay(int ms) {
    while (ms-- > 0) {
       volatile int x=5971;
       while (x-- > 0)
@@ -18,7 +24,7 @@ void ms_delay(int ms);
 
 
 //GLOBAL VARIABLES
-static int j=10;
+static short j=10;
 short adc_resultA[50];
 short adc_resultB[50];
 
@@ -69,29 +75,47 @@ short adc_resultB[50];
 		return p;
 	}
 
- 
-
-//void DMA2_Stream4_IRQHandler(void)
-//{
-//HAL_DMA_IRQHandler();
-//}
-__irq void IRQHandler (void);
-
-__irq void IRQHandler ()
+__irq void DMA2_Stream4_IRQHandler()
 {
-   //volatile unsigned int *base = (unsigned int *) 0x80000000;
-  //   if (*base == 0x000000B4)   
-	//	 {			 // which interrupt was it?
-        TIM3->SR &= ~TIM_SR_UIF; // clear UIF flag
-			ADC1->CR2 |= 0xFFFF; 
-	//	 }   
-    
-	//	if(TIM3->SR & TIM_SR_UIF) // if UIF flag is set	
-		
+
+    //     ADC1->CR2^=(0x00000001);
+         
+	//TIM3->SR &= ~TIM_SR_UIF; // clear UIF flag
+  TIM3->CR1 ^= (0x00000001);
+	DMA2->HIFCR|=DMA_HIFCR_CTCIF4; //clear interrupt
+    //    DMA2->HIFCR|=DMA_HIFCR_CHTIF4;//clear half transfer int
+       
+      
+        
+      if (  !(DMA2_Stream4->CR)&(DMA_SxCR_CT) ) //if current target is M0
+    {
+ DMA2_Stream3->M0AR = (uint32_t)&adc_resultA[0];
+ 
+        }
+      
+       if (  (DMA2_Stream4->CR)&(DMA_SxCR_CT) )
+        {
+          DMA2_Stream3->M1AR = (uint32_t)&adc_resultA[0];
+        }
+				
+			
 }
+
 void main () {
-static int dummy=0;
-	
+
+int i;
+/*
+  for(i=0;i<48;i++)
+  {
+    adc_resultA[i]=0xFF;
+  }
+  
+   for(i=0;i<48;i++)
+  {
+    adc_resultB[i]=0xAA;
+  }
+  */
+		//APB2=No predivisor=Max Clock=84Mhz
 	//peripheral clock enable register ,enable SPI1 clock
 	RCC->APB2ENR |=  RCC_APB2ENR_SPI1EN ; 
 	
@@ -101,28 +125,27 @@ static int dummy=0;
         //DMA2 Clock
         RCC->AHB1ENR |= RCC_AHB1ENR_DMA2EN;
 	
+        //Enable TIM3
 	RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;
 
-
-TIM3->PSC = 23999;	        // Set prescaler to 24 000 (PSC + 1)
-TIM3->ARR = 3000;	          // Auto reload value 1000
-TIM3->DIER |= TIM_DIER_UIE; // Enable update interrupt (timer level)
-TIM3->CR1 |= TIM_CR1_CEN;   // Enable timer
-
-
-HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_0);
-HAL_NVIC_SetPriority ( TIM3_IRQn, 0, 0); 
-HAL_NVIC_EnableIRQ (TIM3_IRQn); 
-            
-
-		//APB2=No predivisor=Max Clock=84Mhz
-	
 	//* Enbale GPIOA clock */
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
 
 	//* Enbale GPIOB clock */
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
+        
 
+TIM3->PSC = 23999;	        // Set prescaler to 24 000 (PSC + 1)
+TIM3->ARR = 4000;	          // Auto reload value 1000
+TIM3->DIER |= TIM_DIER_UIE; // Enable update interrupt (timer level)
+TIM3->CR1 |= TIM_CR1_CEN;   // Enable timer
+         
+   //      while (!(TIM3->SR & TIM_SR_UIF)); 
+
+NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_0);
+NVIC_SetPriority ( DMA2_Stream4_IRQn,0); 
+NVIC_EnableIRQ (DMA2_Stream4_IRQn); 
+            
 
 	GPIOA->MODER |=set_pin_AF(5);
 	GPIOA->AFR[0]|=AF_sel(5);
@@ -164,17 +187,18 @@ HAL_NVIC_EnableIRQ (TIM3_IRQn);
                 DMA2_Stream4->PAR |= (uint32_t)&ADC1->DR;
                 DMA2_Stream4->M0AR |= (uint32_t)&adc_resultA[0];
                 DMA2_Stream4->M1AR |= (uint32_t)&adc_resultB[0];
-                DMA2_Stream4->NDTR |=0x320; //50 x 16 items transfer
-		        
+                DMA2_Stream4->NDTR |=0x00000032; //50 readings transfer
                //DMA DOUBLE BUFFER
-        //        DMA2_Stream4->CR |= DMA_SxCR_DBM; //Buffer switiching enabeld
+                DMA2_Stream4->CR |= DMA_SxCR_DBM; //Buffer switiching enabeld
+                DMA2_Stream4->CR |=DMA_SxCR_TCIE; //full transfer interrupt enabled
+            //    DMA2_Stream4->CR |=DMA_SxCR_HTIE;//half transfer interrupt enabled
                 
                 DMA2_Stream4->CR |=(1<<11);   //Set Peripheral data size to 16bits
 		DMA2_Stream4->CR |=(3<<16); //high prority
 		DMA2_Stream4->CR |=(0<<25); //select channel 0
-                DMA2_Stream4->CR |=DMA_SxCR_CIRC; //circular mode set
+          //      DMA2_Stream4->CR |=DMA_SxCR_CIRC; //circular mode set
                 DMA2_Stream4->CR |=DMA_SxCR_MINC; //memory increment
-							//	DMA2_Stream4->CR |=(1<<6); //direction
+		//	DMA2_Stream4->CR |=(1<<6); //direction
                 //DMA2_Stream4->CR |= (1<<5) ; //[perh is flowcontroller
                  //Emable DMA Stream for ADC
                DMA2_Stream4->CR |=DMA_SxCR_EN;
@@ -203,20 +227,20 @@ HAL_NVIC_EnableIRQ (TIM3_IRQn);
 	SPI1->CR1 |=SPI_CR1_MSTR;						
 		
 	SPI1->CR2|=SPI_CR2_TXDMAEN; //DMA request when TX empty flag set
-	SPI1->CR2|=   SPI_CR2_SSOE;
+	SPI1->CR2|=SPI_CR2_SSOE;
 	
-	char dma_str[]="Testing SPI and then wireless communication from STM to  CC3200";
-	
-             
-		
+
 		DMA2_Stream3->CR &= 0;
 		while ( (DMA2_Stream3->CR !=0));
 	
                 //DMA CONFIG for SPI
 		DMA2_Stream3->PAR |= (uint32_t)&SPI1->DR;
                 DMA2_Stream3->M0AR |= (uint32_t)&adc_resultA[0];//dma_str[0];
-		DMA2_Stream3->NDTR |=0x10;
-		
+      //          DMA2_Stream3->M1AR |= (uint32_t)&adc_resultB[0];
+		DMA2_Stream3->NDTR |=0x0000000C;
+		//DMA DOUBLE BUFFER
+         //       DMA2_Stream3->CR |= DMA_SxCR_DBM; //Buffer switiching enabeld
+   //             DMA2_Stream3->CR |=DMA_SxCR_TCIE; //Half transfer interrupt enabled
 		DMA2_Stream3->CR |=(1<<11);   //Set Peripheral data size to 16bits
 		DMA2_Stream3->CR |=(3<<16); //high prority
 		DMA2_Stream3->CR |=(3<<25); //select channel 3         
@@ -242,23 +266,9 @@ while (1){
 	
 ms_delay(500);
     
-
 SPIsend(ADC1->DR);
 	  while (SPI1->SR & SPI_SR_BSY);
-
 }*/
-/*
-	int j=0;
-	int i=0;
-	const char *str="Testing SPI-1 communication from STM32 Nucleo on Keil to CC3200 on CCS-SPI Clock 10 Mhz ";
-	
-	 while(str[i] != 0) {
-        SPIsend(str[i++]);	
-    }
-	  while (SPI1->SR & SPI_SR_BSY);
-	
-*/
-
 //	GPIOB->BSRRL|=0x0040;                  //CS Disable (high)
 	
 	
@@ -271,6 +281,5 @@ SPIsend(ADC1->DR);
 	
 	
 while(1);
-
 
 }
