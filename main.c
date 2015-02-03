@@ -27,7 +27,7 @@ void ms_delay(int ms) {
 static short j=10;
 short adc_resultA[50];
 short adc_resultB[50];
-
+short adc_resultC[50];
 
 
  unsigned int SPIsend(unsigned int data)
@@ -74,7 +74,10 @@ short adc_resultB[50];
 		p=1<<(p*2);
 		return p;
 	}
-
+ 
+ 
+ 
+ /*
 __irq void DMA2_Stream4_IRQHandler()
 {
 
@@ -83,28 +86,54 @@ __irq void DMA2_Stream4_IRQHandler()
 	//TIM3->SR &= ~TIM_SR_UIF; // clear UIF flag
   TIM3->CR1 ^= (0x00000001);
 	DMA2->HIFCR|=DMA_HIFCR_CTCIF4; //clear interrupt
+        DMA2->LIFCR|=DMA_LIFCR_CTEIF3; //clear interrupt
+        DMA2_Stream3->CR |=DMA_SxCR_EN;
     //    DMA2->HIFCR|=DMA_HIFCR_CHTIF4;//clear half transfer int
-       
-      
+      //    DMA2_Stream3->M1AR |= (uint32_t)&adc_resultA[0];
         
-      if (  !(DMA2_Stream4->CR)&(DMA_SxCR_CT) ) //if current target is M0
-    {
- DMA2_Stream3->M0AR = (uint32_t)&adc_resultA[0];
- 
+        if (  !(DMA2_Stream4->CR)&(DMA_SxCR_CT) ) //if ADC current target is M0(CT==0),DMA_SxM1AR(ADC Buffer B) can be given to SPI DMA
+    {   
+         if (  !(DMA2_Stream3->CR)&(DMA_SxCR_CT) )//if SPI current target is M0(CT==0),give ADC DMA_SxM1AR to SPI DMA M1AR
+         {  
+            DMA2_Stream3->M1AR&=0;
+            DMA2_Stream3->M1AR |= (uint32_t)&adc_resultB[0];
+            DMA2_Stream3->NDTR |=0x00000032;
         }
-      
-       if (  (DMA2_Stream4->CR)&(DMA_SxCR_CT) )
+        else
         {
-          DMA2_Stream3->M1AR = (uint32_t)&adc_resultA[0];
+            DMA2_Stream3->M0AR&=0;
+            DMA2_Stream3->M0AR |= (uint32_t)&adc_resultB[0];
+            DMA2_Stream3->NDTR |=0x00000032;
+       
         }
-				
-			
 }
 
+       if (  (DMA2_Stream4->CR)&(DMA_SxCR_CT) )//if ADC current target is M1(CT==1),DMA_SxM0AR(ADC buffer A) can be given to SPI DMA
+       {       
+         if (  !(DMA2_Stream3->CR)&(DMA_SxCR_CT) )//if SPI current target is M0(CT==0),give ADC DMA_SxM1AR to SPI DMA M1AR
+         {  
+            DMA2_Stream3->M1AR&=0;
+            DMA2_Stream3->M1AR |= (uint32_t)&adc_resultA[0];
+            DMA2_Stream3->NDTR |=0x00000032;
+        }
+        else
+        {
+            DMA2_Stream3->M0AR&=0;
+            DMA2_Stream3->M0AR |= (uint32_t)&adc_resultA[0];
+            DMA2_Stream3->NDTR |=0x00000032;
+       
+        }
+      
+       }			
+			
+}
+*/
+ 
+ 
 void main () {
 
 int i;
-/*
+
   for(i=0;i<48;i++)
   {
     adc_resultA[i]=0xFF;
@@ -114,7 +143,11 @@ int i;
   {
     adc_resultB[i]=0xAA;
   }
-  */
+   for(i=0;i<48;i++)
+  {
+    adc_resultC[i]=0x33;
+  }
+  
 		//APB2=No predivisor=Max Clock=84Mhz
 	//peripheral clock enable register ,enable SPI1 clock
 	RCC->APB2ENR |=  RCC_APB2ENR_SPI1EN ; 
@@ -142,8 +175,8 @@ TIM3->CR1 |= TIM_CR1_CEN;   // Enable timer
          
    //      while (!(TIM3->SR & TIM_SR_UIF)); 
 
-NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_0);
-NVIC_SetPriority ( DMA2_Stream4_IRQn,0); 
+NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4);
+NVIC_SetPriority ( DMA2_Stream4_IRQn,4); 
 NVIC_EnableIRQ (DMA2_Stream4_IRQn); 
             
 
@@ -175,9 +208,11 @@ NVIC_EnableIRQ (DMA2_Stream4_IRQn);
 
 //	GPIOB->BSRRL|=0x0040;                  //CS Disable (high)
 
-
-						
-		//DMA CONFIG FOR ADC
+   
+              
+              
+             
+      	//DMA CONFIG FOR ADC
                 DMA2_Stream4->CR &= 0;
 		while ( (DMA2_Stream4->CR !=0));
                 
@@ -201,10 +236,10 @@ NVIC_EnableIRQ (DMA2_Stream4_IRQn);
 		//	DMA2_Stream4->CR |=(1<<6); //direction
                 //DMA2_Stream4->CR |= (1<<5) ; //[perh is flowcontroller
                  //Emable DMA Stream for ADC
-               DMA2_Stream4->CR |=DMA_SxCR_EN;
+                DMA2_Stream4->CR |=DMA_SxCR_EN;
         
 
-               
+              
         
         
 	ADC->CCR|=0x00030000; //ADC Prescaler set to 8 (PCLK2/8) where pclk2 is 84Mhz
@@ -217,11 +252,10 @@ NVIC_EnableIRQ (DMA2_Stream4_IRQn);
         ADC1->CR2 |=ADC_CR2_SWSTART;	//Start conversion
         while ((ADC_SR_EOC)==0);  //end of conversion,(EOC=0) not completed
 	
-       
+    
 	
-	
-        SPI1->CR1 |=SPI_CR1_DFF; //16 bit data frame
-	SPI1->CR1 |=(0x0002<<3); // Baud Rate as  fpclk/8 (10.5Mhz) where fpclk is APB2 clock=84Mhz
+	SPI1->CR1 |=SPI_CR1_DFF; //16 bit data frame
+	SPI1->CR1 |=(0x0001<<3); // Baud Rate as  fpclk/8 (10.5Mhz) where fpclk is APB2 clock=84Mhz
 		//	SPI1->CR1 |= SPI_CR1_SSM ;
 		//	SPI1->CR1 |= SPI_CR1_SSI;                       
 	SPI1->CR1 |=SPI_CR1_MSTR;						
@@ -235,27 +269,28 @@ NVIC_EnableIRQ (DMA2_Stream4_IRQn);
 	
                 //DMA CONFIG for SPI
 		DMA2_Stream3->PAR |= (uint32_t)&SPI1->DR;
-                DMA2_Stream3->M0AR |= (uint32_t)&adc_resultA[0];//dma_str[0];
-      //          DMA2_Stream3->M1AR |= (uint32_t)&adc_resultB[0];
-		DMA2_Stream3->NDTR |=0x0000000C;
+                DMA2_Stream3->M0AR |= (uint32_t)&adc_resultA[0]; 
+                DMA2_Stream3->M1AR |= (uint32_t)&adc_resultB[0];
+		DMA2_Stream3->NDTR |=0x00000032;
 		//DMA DOUBLE BUFFER
-         //       DMA2_Stream3->CR |= DMA_SxCR_DBM; //Buffer switiching enabeld
-   //             DMA2_Stream3->CR |=DMA_SxCR_TCIE; //Half transfer interrupt enabled
+                DMA2_Stream3->CR |= DMA_SxCR_DBM; //Buffer switiching enabeld
+//                DMA2_Stream3->CR |=DMA_SxCR_TCIE; //FUll transfer interrupt enabled
 		DMA2_Stream3->CR |=(1<<11);   //Set Peripheral data size to 16bits
 		DMA2_Stream3->CR |=(3<<16); //high prority
 		DMA2_Stream3->CR |=(3<<25); //select channel 3         
-		//	DMA2_Stream3->CR |=DMA_SxCR_MINC;
+		DMA2_Stream3->CR |=DMA_SxCR_MINC;
 		DMA2_Stream3->CR |=DMA_SxCR_CIRC; //circular mode set for SPI
 		DMA2_Stream3->CR |=(1<<6); //direction
 		//      DMA2_Stream3->CR |= (1<<5) ; //[perh is flowcontroller
 		
          
                 //Emable DMA Stream for SPI
-              DMA2_Stream3->CR |=DMA_SxCR_EN;
-	
+                DMA2_Stream3->CR |=DMA_SxCR_EN;
 
 //	Enable SPI
 	SPI1->CR1|=SPI_CR1_SPE;
+	
+     
         
 
   //  GPIOB->BSRRH|=0x0040 ; //CS Enable (low)
