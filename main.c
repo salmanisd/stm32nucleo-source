@@ -2,6 +2,7 @@
 
 //Prototypes
 void ms_delay(int ms);
+//uint8_t SPIsend(uint8_t data);
 unsigned int SPIsend(unsigned int data);
 int set_pin_AF(int p);
 int AF_sel(int p);
@@ -30,19 +31,16 @@ short adc_resultB[50];
 short adc_resultC[50];
 
 
- unsigned int SPIsend(unsigned int data)
+unsigned int SPIsend(unsigned int data)
 {
-	int dummy=0;
+	int recv=0;
 	SPI1->DR=data;
 
-	while( !(SPI1->SR & SPI_SR_TXE) );
-/*	if( SPI1->DR & SPI_SR_OVR )
-		while(1)
-			;*/
-	while(! (SPI1->SR & SPI_SR_RXNE));
-	//
+	while(!(SPI1->SR & SPI_SR_TXE));
+
+	while(!(SPI1->SR & SPI_SR_RXNE));
 	
-	//ms_delay(1);
+while (SPI1->SR & SPI_SR_BSY);
 
 	return (SPI1->DR);
 	
@@ -80,7 +78,6 @@ short adc_resultC[50];
  /*
 __irq void DMA2_Stream4_IRQHandler()
 {
-
     //     ADC1->CR2^=(0x00000001);
          
 	//TIM3->SR &= ~TIM_SR_UIF; // clear UIF flag
@@ -107,7 +104,6 @@ __irq void DMA2_Stream4_IRQHandler()
        
         }
 }
-
        if (  (DMA2_Stream4->CR)&(DMA_SxCR_CT) )//if ADC current target is M1(CT==1),DMA_SxM0AR(ADC buffer A) can be given to SPI DMA
        {       
          if (  !(DMA2_Stream3->CR)&(DMA_SxCR_CT) )//if SPI current target is M0(CT==0),give ADC DMA_SxM1AR to SPI DMA M1AR
@@ -132,7 +128,7 @@ __irq void DMA2_Stream4_IRQHandler()
  
 void main () {
 
-int i;
+int i=0;
 
   for(i=0;i<48;i++)
   {
@@ -255,12 +251,12 @@ NVIC_EnableIRQ (DMA2_Stream4_IRQn);
     
 	
 	SPI1->CR1 |=SPI_CR1_DFF; //16 bit data frame
-	SPI1->CR1 |=(0x0001<<3); // Baud Rate as  fpclk/8 (10.5Mhz) where fpclk is APB2 clock=84Mhz
-		//	SPI1->CR1 |= SPI_CR1_SSM ;
-		//	SPI1->CR1 |= SPI_CR1_SSI;                       
+	SPI1->CR1 |=SPI_CR1_BR_0; // Baud Rate as  fpclk/4 (21 Mhz) where fpclk is APB2 clock=84Mhz
+		SPI1->CR1 |= SPI_CR1_SSM ;
+		SPI1->CR1 |= SPI_CR1_SSI;                       
 	SPI1->CR1 |=SPI_CR1_MSTR;						
 		
-	SPI1->CR2|=SPI_CR2_TXDMAEN; //DMA request when TX empty flag set
+//	SPI1->CR2|=SPI_CR2_TXDMAEN; //DMA request when TX empty flag set
 	SPI1->CR2|=SPI_CR2_SSOE;
 	
 
@@ -285,14 +281,23 @@ NVIC_EnableIRQ (DMA2_Stream4_IRQn);
 		
          
                 //Emable DMA Stream for SPI
-                DMA2_Stream3->CR |=DMA_SxCR_EN;
+        //        DMA2_Stream3->CR |=DMA_SxCR_EN;
 
 //	Enable SPI
 	SPI1->CR1|=SPI_CR1_SPE;
 	
-     
-        
+     const char *test="Talaria";
+     GPIOB->BSRRL|=0x0040;                  //CS Disable (high)  
+                    GPIOB->BSRRH|=0x0040 ; //CS Enable (low)
+i=0;
+     while(test[i]!=0)
+     {
+       SPIsend(test[i++]);
+     }
 
+          
+        
+     
   //  GPIOB->BSRRH|=0x0040 ; //CS Enable (low)
 
 	
