@@ -380,13 +380,13 @@ NVIC_EnableIRQ (DMA2_Stream2_IRQn);
 	SPI1->CR1 |=SPI_CR1_DFF; //16 bit data frame
 	SPI1->CR1 |=SPI_CR1_BR_0; // Baud Rate as  fpclk/4 (21 Mhz) where fpclk is APB2 clock=84Mhz
 
-	SPI1->CR1 |= SPI_CR1_SSM ;
-	SPI1->CR1 |= SPI_CR1_SSI;                       
-	SPI1->CR1 |=SPI_CR1_MSTR;						
+//	SPI1->CR1 |= SPI_CR1_SSM ; SSM=0 for STM Slave mode
+//	SPI1->CR1 |= SPI_CR1_SSI;                       
+//	SPI1->CR1 |=SPI_CR1_MSTR;						
 		
 	SPI1->CR2|=SPI_CR2_TXDMAEN; //DMA request when TX empty flag set
         SPI1->CR2|=SPI_CR2_RXDMAEN; //Rx Buffer DMA Enable 
-	SPI1->CR2|=SPI_CR2_SSOE;
+//	SPI1->CR2|=SPI_CR2_SSOE;
 	
 /****************************************************************************************************/
         /* DMA Config For SPI_TX */
@@ -453,9 +453,9 @@ spi_cs_enable();
 	
         			
 
-        SPIsend(11);
+     //   SPIsend(11);
         resume_SPIRX_DMA();
-      			resume_SPITX_DMA();
+      	resume_SPITX_DMA();
 
 
 			      
