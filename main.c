@@ -19,6 +19,13 @@ void resume_SPIRX_DMA(void);
 void spi_cs_enable(void);
 void spi_cs_disable(void);
 
+void spi_master(void);
+void spi_slave(void);
+
+void submode0 (void);
+void submode1 (void);
+void submode2 (void);
+void submode3 (void);
 
 __irq void DMA2_Stream4_IRQHandler(void);
 __irq void DMA2_Stream3_IRQHandler(void);
@@ -52,6 +59,38 @@ unsigned long shadow_ndtr1;
 unsigned int suspend_flag=0;
 unsigned int resume_flag=0;
 
+void spi_master(void)
+{
+	SPI1->CR1 |=SPI_CR1_BR_0; // Baud Rate as  fpclk/4 (21 Mhz) where fpclk is APB2 clock=84Mhz
+	SPI1->CR1 |= SPI_CR1_SSM ; //SSM=0 for STM Slave mode
+	SPI1->CR1 |= SPI_CR1_SSI;                       
+	SPI1->CR1 |=SPI_CR1_MSTR;
+       	SPI1->CR2|=SPI_CR2_SSOE;
+
+}
+
+
+
+void submode0 (void)
+{
+  //       SPI1->CR1 |=SPI_CR1_CPHA;
+ //    SPI1->CR1 |=SPI_CR1_CPOL;
+}
+void submode1 (void)
+{
+         SPI1->CR1 |=SPI_CR1_CPHA;
+ //    SPI1->CR1 |=SPI_CR1_CPOL;
+}
+void submode2 (void)
+{
+  //       SPI1->CR1 |=SPI_CR1_CPHA;
+     SPI1->CR1 |=SPI_CR1_CPOL;
+}
+void submode3 (void)
+{
+         SPI1->CR1 |=SPI_CR1_CPHA;
+     SPI1->CR1 |=SPI_CR1_CPOL;
+}
 void suspend_SPITX_DMA(void)
 {
 //Emable DMA Stream for SPI
@@ -112,17 +151,17 @@ void resume_SPIRX_DMA(void)
 
 
 unsigned short SPIsend(unsigned short data)
-{
+
+{while(!(SPI1->SR & SPI_SR_TXE));
+while (SPI1->SR & SPI_SR_BSY);
 	SPI1->DR=data;
 
-	while(!(SPI1->SR & SPI_SR_TXE));
-
-	//while(!(SPI1->SR & SPI_SR_RXNE));
+	while(!(SPI1->SR & SPI_SR_RXNE));
 	
-while (SPI1->SR & SPI_SR_BSY);
+//while (SPI1->SR & SPI_SR_BSY);
 
-//	return (SPI1->DR);
-	return 0;
+	return (SPI1->DR);
+	//return 0;
 	
 }
 
@@ -309,24 +348,27 @@ NVIC_EnableIRQ (DMA2_Stream2_IRQn);
 	GPIOA->OTYPER |=0;
 	GPIOA->OSPEEDR |=set_ospeed(5); 
 //	GPIOA->PUPDR|=set_pulldir(5);
-
+//GPIOA->PUPDR|=0x400; //pullup
+//GPIOA->PUPDR|=0x800; //pulldown
 	GPIOA->MODER |=set_pin_AF(6);
 	GPIOA->AFR[0]|=AF_sel(6);
 	GPIOA->OTYPER |=0;
 	GPIOA->OSPEEDR |=set_ospeed(6); 
 //	GPIOA->PUPDR|=set_pulldir(6);
-
-	GPIOA->MODER |=set_pin_AF(7);
+//GPIOA->PUPDR|=0x2005; //pull down
+//GPIOA->PUPDR|=0x1005;//pull up
+	
+        GPIOA->MODER |=set_pin_AF(7);
 	GPIOA->AFR[0]|=AF_sel(7);
 	GPIOA->OTYPER |=0;
 	GPIOA->OSPEEDR |=set_ospeed(7); 
 //	GPIOA->PUPDR|=set_pulldir(7);
-
+/*
 	GPIOB->MODER |=(0x01<<12);
 	GPIOB->OTYPER |=0;
 	GPIOB->OSPEEDR |=set_ospeed(6); 
 	GPIOB->BSRRL|=0x0040;                  //set portB pin6 as output=1,CS Disable (high)
-
+*/
 	GPIOA->MODER |= 0X0000000F; //FOR ADC MCU pins PA0 and PA1 set to analog mode
 
 
@@ -375,18 +417,13 @@ NVIC_EnableIRQ (DMA2_Stream2_IRQn);
         ADC1->CR2 |=ADC_CR2_SWSTART;	//Start conversion
         while ((ADC_SR_EOC)==0);  //end of conversion,(EOC=0) not completed
 	
-    
-	
+    SPI1->CR1 &=0x00000000;
 	SPI1->CR1 |=SPI_CR1_DFF; //16 bit data frame
-	SPI1->CR1 |=SPI_CR1_BR_0; // Baud Rate as  fpclk/4 (21 Mhz) where fpclk is APB2 clock=84Mhz
+   	                spi_master();
 
-//	SPI1->CR1 |= SPI_CR1_SSM ; SSM=0 for STM Slave mode
-//	SPI1->CR1 |= SPI_CR1_SSI;                       
-//	SPI1->CR1 |=SPI_CR1_MSTR;						
-		
-	SPI1->CR2|=SPI_CR2_TXDMAEN; //DMA request when TX empty flag set
-        SPI1->CR2|=SPI_CR2_RXDMAEN; //Rx Buffer DMA Enable 
-//	SPI1->CR2|=SPI_CR2_SSOE;
+      SPI1->CR2|=SPI_CR2_TXDMAEN; //DMA request when TX empty flag set
+     SPI1->CR2|=SPI_CR2_RXDMAEN; //Rx Buffer DMA Enable 
+
 	
 /****************************************************************************************************/
         /* DMA Config For SPI_TX */
@@ -446,51 +483,24 @@ NVIC_EnableIRQ (DMA2_Stream2_IRQn);
         //        DMA2_Stream2->CR |=DMA_SxCR_EN;
          //        while (! (DMA2_Stream2->CR & DMA_SxCR_EN) ); //break out when DMA_SxCR_EN==1
 /****************************************************************************************************/                
-spi_cs_enable();
+        spi_cs_enable();
 
 //	Enable SPI
 	SPI1->CR1|=SPI_CR1_SPE;
 	
-        			
-
-     //   SPIsend(11);
-        resume_SPIRX_DMA();
-      	resume_SPITX_DMA();
-
-
-			      
-
-      
-   
-//      for (i=0;i<50;i++)
-//       {
-//            SPIsend(33);
-//        }
-//         for (i=0;i<50;i++)
-//       {
-//            SPIsend(44);
-//        }
-//     
-//          SPIsend(12);
-//              SPIsend(12);
-        
-        
-  //         suspend_SPI_DMA();
-           
-        
-  //      resume_SPI_DMA();
-
+		
+// resume_SPIRX_DMA();
+       resume_SPITX_DMA();
+    //    SPIsend(0x00);
+ // recv_data[0]=    SPIsend(0x1AF6);
+  //      SPI1->DR=0x00F6;
+        //recv_data[0]=    SPIsend(0x01ED);
+         //   recv_data[1]=    SPIsend(0x0021);
+      //          recv_data[3]=    SPIsend(0x7C9D);
+      //    SPIsend(0x01);
  
+       
 
-
-	
-	
-	
-	
-	
-	
-	
-	
 	
 while(1);
 }
