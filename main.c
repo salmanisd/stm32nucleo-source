@@ -61,6 +61,12 @@ unsigned int resume_flag=0;
 
 void spi_master(void)
 {
+  
+        GPIOB->MODER |=(0x01<<12);
+	GPIOB->OTYPER |=0;
+	GPIOB->OSPEEDR |=set_ospeed(6); 
+	GPIOB->BSRRL|=0x0040;                  //set portB pin6 as output=1,CS Disable (high)
+  
 	SPI1->CR1 |=SPI_CR1_BR_0; // Baud Rate as  fpclk/4 (21 Mhz) where fpclk is APB2 clock=84Mhz
 	SPI1->CR1 |= SPI_CR1_SSM ; //SSM=0 for STM Slave mode
 	SPI1->CR1 |= SPI_CR1_SSI;                       
@@ -363,12 +369,9 @@ NVIC_EnableIRQ (DMA2_Stream2_IRQn);
 	GPIOA->OTYPER |=0;
 	GPIOA->OSPEEDR |=set_ospeed(7); 
 //	GPIOA->PUPDR|=set_pulldir(7);
-/*
-	GPIOB->MODER |=(0x01<<12);
-	GPIOB->OTYPER |=0;
-	GPIOB->OSPEEDR |=set_ospeed(6); 
-	GPIOB->BSRRL|=0x0040;                  //set portB pin6 as output=1,CS Disable (high)
-*/
+
+	
+
 	GPIOA->MODER |= 0X0000000F; //FOR ADC MCU pins PA0 and PA1 set to analog mode
 
 
@@ -419,7 +422,7 @@ NVIC_EnableIRQ (DMA2_Stream2_IRQn);
 	
     SPI1->CR1 &=0x00000000;
 	SPI1->CR1 |=SPI_CR1_DFF; //16 bit data frame
-   	                spi_master();
+   	            
 
       SPI1->CR2|=SPI_CR2_TXDMAEN; //DMA request when TX empty flag set
      SPI1->CR2|=SPI_CR2_RXDMAEN; //Rx Buffer DMA Enable 
@@ -483,13 +486,15 @@ NVIC_EnableIRQ (DMA2_Stream2_IRQn);
         //        DMA2_Stream2->CR |=DMA_SxCR_EN;
          //        while (! (DMA2_Stream2->CR & DMA_SxCR_EN) ); //break out when DMA_SxCR_EN==1
 /****************************************************************************************************/                
-        spi_cs_enable();
+            spi_master();
+                
+                spi_cs_enable();
 
 //	Enable SPI
 	SPI1->CR1|=SPI_CR1_SPE;
 	
-		
-// resume_SPIRX_DMA();
+	        SPIsend(11);	
+       resume_SPIRX_DMA();
        resume_SPITX_DMA();
     //    SPIsend(0x00);
  // recv_data[0]=    SPIsend(0x1AF6);
