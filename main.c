@@ -3,7 +3,7 @@
 //Prototypes
 void ms_delay(int ms);
 //uint8_t SPIsend(uint8_t data);
-unsigned short SPIsend(unsigned short data);
+unsigned char SPIsend(unsigned char data);
 
 int set_pin_AF(int p);
 int AF_sel(int p);
@@ -156,20 +156,9 @@ void resume_SPIRX_DMA(void)
 
 
 
-unsigned short SPIsend(unsigned short data)
 
-{while(!(SPI1->SR & SPI_SR_TXE));
-while (SPI1->SR & SPI_SR_BSY);
-	SPI1->DR=data;
 
-	while(!(SPI1->SR & SPI_SR_RXNE));
-	
-//while (SPI1->SR & SPI_SR_BSY);
 
-	return (SPI1->DR);
-	//return 0;
-	
-}
 
 
 	int set_pin_AF(int p)
@@ -287,7 +276,20 @@ __irq void DMA2_Stream2_IRQHandler()
 
 }
  
- 
+ unsigned char SPIsend(unsigned char data)
+
+{
+  unsigned char temp;
+   while(!(SPI1->SR & SPI_SR_TXE));
+	SPI1->DR=data;
+  //while (SPI1->SR & SPI_SR_BSY);
+
+   
+     while(!(SPI1->SR & SPI_SR_RXNE));
+temp=SPI1->DR ;
+  
+        return temp;
+}
 void main () {
 
 int i=0;
@@ -356,13 +358,16 @@ NVIC_EnableIRQ (DMA2_Stream2_IRQn);
 //	GPIOA->PUPDR|=set_pulldir(5);
 //GPIOA->PUPDR|=0x400; //pullup
 //GPIOA->PUPDR|=0x800; //pulldown
+
 	GPIOA->MODER |=set_pin_AF(6);
 	GPIOA->AFR[0]|=AF_sel(6);
 	GPIOA->OTYPER |=0;
+//        GPIOA->OTYPER |=0x40; //output open drain
 	GPIOA->OSPEEDR |=set_ospeed(6); 
+ //       GPIOA->OSPEEDR |=0x2000;
 //	GPIOA->PUPDR|=set_pulldir(6);
-//GPIOA->PUPDR|=0x2005; //pull down
-//GPIOA->PUPDR|=0x1005;//pull up
+//GPIOA->PUPDR|=0x2000; //pull down
+//GPIOA->PUPDR|=0x1000;//pull up
 	
         GPIOA->MODER |=set_pin_AF(7);
 	GPIOA->AFR[0]|=AF_sel(7);
@@ -469,9 +474,9 @@ NVIC_EnableIRQ (DMA2_Stream2_IRQn);
                 //DMA CONFIG for SPI_RX
 		DMA2_Stream2->PAR |= (uint32_t)&SPI1->DR;
               DMA2_Stream2->M0AR |= (uint32_t)&recv_data[0]; 
-		DMA2_Stream2->NDTR |=10;
+		DMA2_Stream2->NDTR |=50;
 		//DMA DOUBLE BUFFER
-                DMA2_Stream2->CR |=DMA_SxCR_TCIE; //FUll transfer interrupt enabled
+        //        DMA2_Stream2->CR |=DMA_SxCR_TCIE; //FUll transfer interrupt enabled
 		DMA2_Stream2->CR |=(1<<11);   //Set Peripheral data size to 16bits
 		DMA2_Stream2->CR |=(3<<16); //high prority
 		DMA2_Stream2->CR |=(3<<25); //select channel 3         
@@ -486,20 +491,38 @@ NVIC_EnableIRQ (DMA2_Stream2_IRQn);
         //        DMA2_Stream2->CR |=DMA_SxCR_EN;
          //        while (! (DMA2_Stream2->CR & DMA_SxCR_EN) ); //break out when DMA_SxCR_EN==1
 /****************************************************************************************************/                
-            spi_master();
+    //        spi_master();
                 
-                spi_cs_enable();
+    //            spi_cs_enable();
+ //      SPI1->CR1 |=SPI_CR1_CPHA;
 
+       
+        
 //	Enable SPI
 	SPI1->CR1|=SPI_CR1_SPE;
-	
-	        SPIsend(11);	
-       resume_SPIRX_DMA();
-       resume_SPITX_DMA();
+        
+          resume_SPIRX_DMA();
+      resume_SPITX_DMA();
+//
+//        SPI1->DR=0x46;
+//            while(!(SPI1->SR & SPI_SR_RXNE));
+//recv_data[0]=SPI1->DR ;
+//        while(!(SPI1->SR & SPI_SR_TXE));
+//  	
+//SPI1->DR=0xED;
+//            while(!(SPI1->SR & SPI_SR_RXNE));
+//recv_data[1]=SPI1->DR ;
+   
+
+ 
+
+	//        SPIsend(11);	
+  //     resume_SPIRX_DMA();
+//       resume_SPITX_DMA();
     //    SPIsend(0x00);
- // recv_data[0]=    SPIsend(0x1AF6);
   //      SPI1->DR=0x00F6;
-        //recv_data[0]=    SPIsend(0x01ED);
+        
+ //       recv_data[0]=    SPIsend(0xED);
          //   recv_data[1]=    SPIsend(0x0021);
       //          recv_data[3]=    SPIsend(0x7C9D);
       //    SPIsend(0x01);
