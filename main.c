@@ -19,6 +19,8 @@ void resume_SPIRX_DMA(void);
 void spi_cs_enable(void);
 void spi_cs_disable(void);
 
+void enable_spi(void);
+void disable_spi(void);
 
 __irq void DMA2_Stream4_IRQHandler(void);
 __irq void DMA2_Stream3_IRQHandler(void);
@@ -44,42 +46,76 @@ short adc_resultC[50];
 
 short test_bufA[50];
 short test_bufB[50];
+   
+unsigned int saveNDTR;
+static int flag=0;
 
-short recv_data[50];
+static int spdtxdma=0;
+static int restxdma=0;
+volatile int h=0;
 
-unsigned long shadow_ndtr;
-unsigned long shadow_ndtr1;
-unsigned int suspend_flag=0;
-unsigned int resume_flag=0;
+ static short *ptr;
+static short *ptr2;
+unsigned short recv_data[50];
+unsigned short get_lost[1];
 
+void enable_spi(void)
+{
+  
+  SPI1->CR1 &=0x00000000;
+	SPI1->CR1 |=SPI_CR1_DFF; //16 bit data frame
+	SPI1->CR1 |=SPI_CR1_BR_0; // Baud Rate as  fpclk/4 (21 Mhz) where fpclk is APB2 clock=84Mhz
+
+	SPI1->CR1 |= SPI_CR1_SSM ;
+	SPI1->CR1 |= SPI_CR1_SSI;                       
+	SPI1->CR1 |=SPI_CR1_MSTR;
+        
+        SPI1->CR2|=SPI_CR2_TXDMAEN; //DMA request when TX empty flag set
+//      SPI1->CR2|=SPI_CR2_RXDMAEN; //Rx Buffer DMA Enable 
+        
+          SPI1->CR2|= SPI_CR2_RXNEIE;
+}
+
+
+
+void disable_spi(void)
+{
+ // while(!(SPI1->SR & SPI_SR_RXNE));
+  while(!(SPI1->SR & SPI_SR_TXE));
+
+	while (SPI1->SR & SPI_SR_BSY);
+          SPI1->CR1 &=0xFFFFFFFE;
+
+}
 void suspend_SPITX_DMA(void)
 {
+    
+  spdtxdma++;
+ while(!(SPI1->SR & SPI_SR_RXNE));
 //Emable DMA Stream for SPI
               DMA2_Stream3->CR &=0xFFFFFFFE;  //toggle EN bit from 1 to 0
          //         DMA2_Stream3->CR ^=DMA_SxCR_EN;  //toggle EN bit from 1 to 0
 while ( DMA2_Stream3->CR & DMA_SxCR_EN ); //break out when DMA_SxCR_EN==0
-
-shadow_ndtr=DMA2_Stream3->NDTR;
+ saveNDTR=DMA2_Stream3->NDTR |=0x00000032;
                 
 
                  
 }
 void resume_SPITX_DMA(void)
-{
+{ 
+  restxdma++;
                 DMA2->LIFCR=DMA_LIFCR_CTCIF3; //clear interrupt
                 DMA2->LIFCR=DMA_LIFCR_CFEIF3; //clear interrupt
-                
+           
                   DMA2_Stream3->M0AR |= (uint32_t)&adc_resultA[0]; 
                 DMA2_Stream3->M1AR |= (uint32_t)&adc_resultB[0];
 		DMA2_Stream3->NDTR |=0x00000032;
                 
-                      shadow_ndtr1=DMA2_Stream3->NDTR;
 
-           resume_flag++;
 
                 DMA2_Stream3->CR |=DMA_SxCR_EN;  //toggle EN bit from 0 to 1
                 
-      //          while (! (DMA2_Stream3->CR & DMA_SxCR_EN) ); //break out when DMA_SxCR_EN==1
+              while (! (DMA2_Stream3->CR & DMA_SxCR_EN) ); //break out when DMA_SxCR_EN==1
              
 }
 
@@ -113,16 +149,16 @@ void resume_SPIRX_DMA(void)
 
 unsigned short SPIsend(unsigned short data)
 {
+  while(!(SPI1->SR & SPI_SR_TXE));
 	SPI1->DR=data;
 
-	while(!(SPI1->SR & SPI_SR_TXE));
-
-	//while(!(SPI1->SR & SPI_SR_RXNE));
 	
-while (SPI1->SR & SPI_SR_BSY);
 
-//	return (SPI1->DR);
-	return 0;
+	while(!(SPI1->SR & SPI_SR_RXNE));
+//	while (SPI1->SR & SPI_SR_BSY);
+
+	return (SPI1->DR);
+//	return 0;
 	
 }
 
@@ -214,15 +250,14 @@ __irq void DMA2_Stream4_IRQHandler()
 */
  __irq void DMA2_Stream3_IRQHandler()
 {
-        DMA2->LIFCR=DMA_LIFCR_CTCIF3; //clear interrupt
+        DMA2->LIFCR|=DMA_LIFCR_CTCIF3; //clear interrupt
+        DMA2->LIFCR|=DMA_LIFCR_CHTIF3;
         while(!(SPI1->SR & SPI_SR_TXE)); //when NDTR==0,this interrupt IRQ is called but the last word is still under transmission 
                                          //so wait for it to complete and when TXE is set,proceed with SPIsend transmission
-  const char *test="Talaria"; 
-    int i=0;
-     while(test[i]!=0)
-     {
-       SPIsend(test[i++]);
-     }
+  
+	while(!(SPI1->SR & SPI_SR_RXNE));
+spi_cs_disable();
+
 }
 
 __irq void DMA2_Stream2_IRQHandler()
@@ -230,7 +265,6 @@ __irq void DMA2_Stream2_IRQHandler()
    	DMA2->LIFCR|=DMA_LIFCR_CTCIF2; //clear interrupt
         DMA2->LIFCR|=DMA_LIFCR_CHTIF2; //clear interrupt
         DMA2->LIFCR|=DMA_LIFCR_CFEIF2; //clear interrupt
-                  suspend_flag++;
 
      if (recv_data[0]==0x4142)
 		 {
@@ -243,23 +277,25 @@ __irq void DMA2_Stream2_IRQHandler()
 }
  __irq void SPI1_IRQHandler()
  {
-   while(!(SPI1->SR & SPI_SR_TXE)); //stay in loop while TX reg is not empty
-   if(SPI1->DR=='AB')
-   {
-   recv_data[0]=SPI1->DR;
-   }
-   else
-   {
-        recv_data[1]=SPI1->DR;
-   }
-	//while(!(SPI1->SR & SPI_SR_TXE));
 
-	
-   
+
+   *ptr=SPI1->DR;
+ if(*ptr!=0x0000) //getting 0x0000 when sending adc values,when NOT 0x0000->cmd coming
+ {
+   h=1;
+ }
+ else
+ {
+   h=0;
+ }
+  // ptr++;
  }
  
 void main () {
 
+
+ptr=&recv_data[0];
+ptr2=&recv_data[0];
 int i=0;
 
   for(i=0;i<48;i++)
@@ -315,14 +351,15 @@ TIM3->CR1 |= TIM_CR1_CEN;   // Enable timer
 
 NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4);
 
-/*
-NVIC_SetPriority ( DMA2_Stream3_IRQn,4); 
-NVIC_EnableIRQ (DMA2_Stream3_IRQn); 
-NVIC_SetPriority ( DMA2_Stream2_IRQn,4); 
-NVIC_EnableIRQ (DMA2_Stream2_IRQn);        
-*/
-//NVIC_SetPriority ( SPI1_IRQn,4); 
-//NVIC_EnableIRQ (SPI1_IRQn); 
+
+//NVIC_SetPriority ( DMA2_Stream3_IRQn,4); 
+//NVIC_EnableIRQ (DMA2_Stream3_IRQn); 
+
+//NVIC_SetPriority ( DMA2_Stream2_IRQn,4); 
+//NVIC_EnableIRQ (DMA2_Stream2_IRQn);        
+
+NVIC_SetPriority ( SPI1_IRQn,4); 
+NVIC_EnableIRQ (SPI1_IRQn); 
 
 
 	GPIOA->MODER |=set_pin_AF(5);  //SPICLK
@@ -374,14 +411,14 @@ NVIC_EnableIRQ (DMA2_Stream2_IRQn);
                 DMA2_Stream4->M1AR |= (uint32_t)&adc_resultB[0];
                 DMA2_Stream4->NDTR |=0x00000032; //50 readings transfer
                //DMA DOUBLE BUFFER
-                DMA2_Stream4->CR |= DMA_SxCR_DBM; //Buffer switiching enabeld
-                DMA2_Stream4->CR |=DMA_SxCR_TCIE; //full transfer interrupt enabled
+               DMA2_Stream4->CR |= DMA_SxCR_DBM; //Buffer switiching enabeld
+       //         DMA2_Stream4->CR |=DMA_SxCR_TCIE; //full transfer interrupt enabled
             //    DMA2_Stream4->CR |=DMA_SxCR_HTIE;//half transfer interrupt enabled
                 
                 DMA2_Stream4->CR |=(1<<11);   //Set Peripheral data size to 16bits
 		DMA2_Stream4->CR |=(3<<16); //high prority
 		DMA2_Stream4->CR |=(0<<25); //select channel 0
-          //      DMA2_Stream4->CR |=DMA_SxCR_CIRC; //circular mode set
+          //     DMA2_Stream4->CR |=DMA_SxCR_CIRC; //circular mode set
                 DMA2_Stream4->CR |=DMA_SxCR_MINC; //memory increment
 		//	DMA2_Stream4->CR |=(1<<6); //direction
                 //DMA2_Stream4->CR |= (1<<5) ; //[perh is flowcontroller
@@ -403,18 +440,10 @@ NVIC_EnableIRQ (DMA2_Stream2_IRQn);
         while ((ADC_SR_EOC)==0);  //end of conversion,(EOC=0) not completed
 	
     
-	
-	SPI1->CR1 |=SPI_CR1_DFF; //16 bit data frame
-	SPI1->CR1 |=SPI_CR1_BR_0; // Baud Rate as  fpclk/4 (21 Mhz) where fpclk is APB2 clock=84Mhz
+							
+	 enable_spi();
 
-	SPI1->CR1 |= SPI_CR1_SSM ;
-	SPI1->CR1 |= SPI_CR1_SSI;                       
-	SPI1->CR1 |=SPI_CR1_MSTR;						
-		
-	SPI1->CR2|=SPI_CR2_TXDMAEN; //DMA request when TX empty flag set
-        SPI1->CR2|=SPI_CR2_RXDMAEN; //Rx Buffer DMA Enable 
-        
-    //   SPI1->CR2|= SPI_CR2_RXNEIE;
+
 /****************************************************************************************************/
         /* DMA Config For SPI_TX */
 /****************************************************************************************************/
@@ -424,19 +453,19 @@ NVIC_EnableIRQ (DMA2_Stream2_IRQn);
                 //DMA CONFIG for SPI_TX
 		DMA2_Stream3->PAR |= (uint32_t)&SPI1->DR;
               DMA2_Stream3->M0AR |= (uint32_t)&adc_resultA[0]; 
-               DMA2_Stream3->M1AR |= (uint32_t)&adc_resultB[0];
+   //            DMA2_Stream3->M1AR |= (uint32_t)&adc_resultB[0];
       //          DMA2_Stream3->M0AR |= (uint32_t)&test_bufA[0]; 
       //          DMA2_Stream3->M1AR |= (uint32_t)&test_bufB[0];
 		DMA2_Stream3->NDTR |=50;
 		//DMA DOUBLE BUFFER
-                DMA2_Stream3->CR |= DMA_SxCR_DBM; //Buffer switiching enabeld
-            //    DMA2_Stream3->CR |=DMA_SxCR_TCIE; //FUll transfer interrupt enabled
+     //           DMA2_Stream3->CR |= DMA_SxCR_DBM; //Buffer switiching enabeld
+        //       DMA2_Stream3->CR |=DMA_SxCR_TCIE; //FUll transfer interrupt enabled
 		DMA2_Stream3->CR |=(1<<11);   //Set Peripheral data size to 16bits
 		DMA2_Stream3->CR |=DMA_SxCR_PL_1;     //Very High prority
                 DMA2_Stream3->CR |=DMA_SxCR_PL_0; 
 		DMA2_Stream3->CR |=(3<<25); //select channel 3         
 		DMA2_Stream3->CR |=DMA_SxCR_MINC;
-	//	DMA2_Stream3->CR |=DMA_SxCR_CIRC; //circular mode set for SPI
+		DMA2_Stream3->CR |=DMA_SxCR_CIRC; //circular mode set for SPI
 		DMA2_Stream3->CR |=(1<<6); //direction
 		//      DMA2_Stream3->CR |= (1<<5) ; //[perh is flowcontroller
 		
@@ -457,7 +486,7 @@ NVIC_EnableIRQ (DMA2_Stream2_IRQn);
                 //DMA CONFIG for SPI_RX
 		DMA2_Stream2->PAR |= (uint32_t)&SPI1->DR;
               DMA2_Stream2->M0AR |= (uint32_t)&recv_data[0]; 
-		DMA2_Stream2->NDTR |=10;
+		DMA2_Stream2->NDTR |=50;
 		//DMA DOUBLE BUFFER
           //      DMA2_Stream2->CR |=DMA_SxCR_TCIE; //FUll transfer interrupt enabled
 		DMA2_Stream2->CR |=(1<<11);   //Set Peripheral data size to 16bits
@@ -465,7 +494,7 @@ NVIC_EnableIRQ (DMA2_Stream2_IRQn);
 		DMA2_Stream2->CR |=(3<<25); //select channel 3         
 		DMA2_Stream2->CR |=DMA_SxCR_MINC;
                 
-	//	DMA2_Stream2->CR |=DMA_SxCR_CIRC; //circular mode set for SPI
+		DMA2_Stream2->CR |=DMA_SxCR_CIRC; //circular mode set for SPI
 	//	DMA2_Stream2->CR |=(1<<6); //direction
 	//      DMA2_Stream2->CR |= (1<<5) ; //[perh is flowcontroller
 		
@@ -474,52 +503,59 @@ NVIC_EnableIRQ (DMA2_Stream2_IRQn);
         //        DMA2_Stream2->CR |=DMA_SxCR_EN;
          //        while (! (DMA2_Stream2->CR & DMA_SxCR_EN) ); //break out when DMA_SxCR_EN==1
 /****************************************************************************************************/                
-//spi_cs_disable();
-         spi_cs_enable();
 
+         
 //	Enable SPI
 	SPI1->CR1|=SPI_CR1_SPE;
-	
+                spi_cs_enable();
         			
 
-   //     SPIsend(11);
- resume_SPIRX_DMA();
+//resume_SPIRX_DMA();
       			resume_SPITX_DMA();
 
 
-			      
 
-      
+while(1)
+{
+  if (h==1)
+  {
+
+    
+    
+    
+    suspend_SPITX_DMA();
+        spi_cs_disable();
+
    
-//      for (i=0;i<50;i++)
-//       {
-//            SPIsend(33);
-//        }
-//         for (i=0;i<50;i++)
-//       {
-//            SPIsend(44);
-//        }
-//     
-//          SPIsend(12);
-//              SPIsend(12);
+    disable_spi();
+    enable_spi();
+     SPI1->CR1|=SPI_CR1_SPE;  
+  spi_cs_enable();
+      
+    while(!(SPI1->SR & SPI_SR_TXE));
+	SPI1->DR=0xFFFF;
+    while(!(SPI1->SR & SPI_SR_TXE));
+        SPI1->DR=0xFFFF;
+            while(!(SPI1->SR & SPI_SR_TXE));
+        SPI1->DR=0xFFFF;
+            while(!(SPI1->SR & SPI_SR_TXE));
+        SPI1->DR=0xFFFF;
         
-        
-  //         suspend_SPI_DMA();
-           
-        
-  //      resume_SPI_DMA();
+     //   while(!(SPI1->SR & SPI_SR_RXNE));
+            spi_cs_disable();
+             spi_cs_enable();
+  ms_delay(2000);
+  ms_delay(2000);
+    
+  resume_SPITX_DMA();
+  }
+}
+	
 
- 
 
 
-	
-	
-	
-	
-	
-	
-	
-	
-	
+
+
+
 while(1);
 }
