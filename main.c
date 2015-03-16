@@ -92,7 +92,7 @@ void suspend_SPITX_DMA(void)
     
   spdtxdma++;
 //while(!(SPI1->SR & SPI_SR_TXE));
- while(!(SPI1->SR & SPI_SR_RXNE));
+// while(!(SPI1->SR & SPI_SR_RXNE));
 
  //Emable DMA Stream for SPI
               DMA2_Stream3->CR &=0xFFFFFFFE;  //toggle EN bit from 1 to 0
@@ -544,11 +544,12 @@ while(1)
   }   
  
             spi_cs_disable();
-         ms_delay(500);
+         ms_delay(1);//1 msec
              
               spi_cs_enable();
   resume_SPITX_DMA();
   }
+  h=0;
 }
 	
 
