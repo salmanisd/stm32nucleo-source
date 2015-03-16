@@ -91,8 +91,10 @@ void suspend_SPITX_DMA(void)
 {
     
   spdtxdma++;
+//while(!(SPI1->SR & SPI_SR_TXE));
  while(!(SPI1->SR & SPI_SR_RXNE));
-//Emable DMA Stream for SPI
+
+ //Emable DMA Stream for SPI
               DMA2_Stream3->CR &=0xFFFFFFFE;  //toggle EN bit from 1 to 0
          //         DMA2_Stream3->CR ^=DMA_SxCR_EN;  //toggle EN bit from 1 to 0
 while ( DMA2_Stream3->CR & DMA_SxCR_EN ); //break out when DMA_SxCR_EN==0
@@ -519,11 +521,11 @@ while(1)
 {
   if (h==1)
   {
-
     
+ //   SPI1->CR2&=0xFFBF; //mask RXNEIE bit
+    unsigned int mosi_high=0;
     
-    
-    suspend_SPITX_DMA();
+       suspend_SPITX_DMA();
         spi_cs_disable();
 
    
@@ -531,22 +533,20 @@ while(1)
     enable_spi();
      SPI1->CR1|=SPI_CR1_SPE;  
   spi_cs_enable();
-      
-    while(!(SPI1->SR & SPI_SR_TXE));
-	SPI1->DR=0xFFFF;
-    while(!(SPI1->SR & SPI_SR_TXE));
-        SPI1->DR=0xFFFF;
-            while(!(SPI1->SR & SPI_SR_TXE));
-        SPI1->DR=0xFFFF;
-            while(!(SPI1->SR & SPI_SR_TXE));
-        SPI1->DR=0xFFFF;
-        
-     //   while(!(SPI1->SR & SPI_SR_RXNE));
+  
+  for(mosi_high=0;mosi_high<4;mosi_high++)
+  {
+     while(!(SPI1->SR & SPI_SR_TXE));
+    SPI1->DR=0xFFFF;  
+  //  if (mosi_high<1)
+  //  while(!(SPI1->SR & SPI_SR_RXNE));
+	
+  }   
+ 
             spi_cs_disable();
-             spi_cs_enable();
-  ms_delay(2000);
-  ms_delay(2000);
-    
+         ms_delay(500);
+             
+              spi_cs_enable();
   resume_SPITX_DMA();
   }
 }
