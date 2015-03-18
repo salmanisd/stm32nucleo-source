@@ -22,6 +22,10 @@ void spi_cs_disable(void);
 void enable_spi(void);
 void disable_spi(void);
 
+
+void enable_int_spi(void);
+void disable_int_spi(void);
+
 __irq void DMA2_Stream4_IRQHandler(void);
 __irq void DMA2_Stream3_IRQHandler(void);
 __irq void DMA2_Stream2_IRQHandler(void);
@@ -58,6 +62,19 @@ volatile int h=0;
 unsigned short recv_data[50];
 unsigned short get_lost[1];
 
+
+void enable_int_spi(void)
+{
+          SPI1->CR2|=SPI_CR2_TXDMAEN; //DMA request when TX empty flag set
+//      SPI1->CR2|=SPI_CR2_RXDMAEN; //Rx Buffer DMA Enable 
+        
+          SPI1->CR2|= SPI_CR2_RXNEIE;
+}
+void disable_int_spi(void)
+{
+   SPI1->CR2&=0xFFBF; //disable interrupt RXNEIE bit
+
+}
 void enable_spi(void)
 {
   
@@ -69,10 +86,7 @@ void enable_spi(void)
 	SPI1->CR1 |= SPI_CR1_SSI;                       
 	SPI1->CR1 |=SPI_CR1_MSTR;
         
-        SPI1->CR2|=SPI_CR2_TXDMAEN; //DMA request when TX empty flag set
-//      SPI1->CR2|=SPI_CR2_RXDMAEN; //Rx Buffer DMA Enable 
-        
-          SPI1->CR2|= SPI_CR2_RXNEIE;
+
 }
 
 
@@ -284,17 +298,30 @@ __irq void DMA2_Stream2_IRQHandler()
  __irq void SPI1_IRQHandler()
  {
 
+  SPI1->CR2&=0xFFBF; //mask RXNEIE bit
 
-   *ptr=SPI1->DR;
- if(*ptr!=0x0000) //getting 0x0000 when sending adc values,when NOT 0x0000->cmd coming
- {
-   h=1;
- }
- else
- {
-   h=0;
- }
-  // ptr++;
+if (SPI1->DR!=0x0000)
+{
+  h=1;
+}
+else
+{
+  h=0;
+}
+          SPI1->CR2|= SPI_CR2_RXNEIE;
+
+   
+   
+//   *ptr=SPI1->DR;
+// if(*ptr!=0x0000) //getting 0x0000 when sending adc values,when NOT 0x0000->cmd coming
+// {
+//   h=1;
+// }
+// else
+// {
+//   h=0;
+// }
+//  // ptr++;
  }
  
 void main () {
@@ -510,7 +537,7 @@ NVIC_EnableIRQ (SPI1_IRQn);
          //        while (! (DMA2_Stream2->CR & DMA_SxCR_EN) ); //break out when DMA_SxCR_EN==1
 /****************************************************************************************************/                
 
-         
+         enable_int_spi();
 //	Enable SPI
 	SPI1->CR1|=SPI_CR1_SPE;
                 spi_cs_enable();
@@ -527,7 +554,6 @@ while(1)
   if (h==1)
   {
     
- //   SPI1->CR2&=0xFFBF; //mask RXNEIE bit
     unsigned int mosi_high=0;
     
        suspend_SPITX_DMA();
@@ -536,10 +562,12 @@ while(1)
    
     disable_spi();
     enable_spi();
+             disable_int_spi();
+
      SPI1->CR1|=SPI_CR1_SPE;  
   spi_cs_enable();
   
-  for(mosi_high=0;mosi_high<4;mosi_high++)
+  for(mosi_high=0;mosi_high<2;mosi_high++)
   {
      while(!(SPI1->SR & SPI_SR_TXE));
     SPI1->DR=0xFFFF;  
@@ -547,13 +575,15 @@ while(1)
   //  while(!(SPI1->SR & SPI_SR_RXNE));
 	
   }   
- 
+       ms_delay(1000);//1 msec   
             spi_cs_disable();
-         ms_delay(2000);//1 msec
-             
+      
               spi_cs_enable();
+     
+         enable_int_spi();
+
   resume_SPITX_DMA();
-    ms_delay(2000);
+
   }
   h=0;
 }
