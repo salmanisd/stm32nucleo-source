@@ -69,9 +69,9 @@ unsigned short cmd_data[20];
 void enable_int_spi(void)
 {
           SPI1->CR2|=SPI_CR2_TXDMAEN; //DMA request when TX empty flag set
-      SPI1->CR2|=SPI_CR2_RXDMAEN; //Rx Buffer DMA Enable 
+  //    SPI1->CR2|=SPI_CR2_RXDMAEN; //Rx Buffer DMA Enable 
         
-  //        SPI1->CR2|= SPI_CR2_RXNEIE;
+       SPI1->CR2|= SPI_CR2_RXNEIE;
 }
 void disable_int_spi(void)
 {
@@ -158,7 +158,7 @@ void resume_SPIRX_DMA(void)
                 DMA2->LIFCR=DMA_LIFCR_CFEIF2; //clear interrupt
                 		
                 DMA2_Stream2->PAR = (uint32_t)&SPI1->DR;
-                DMA2_Stream2->M0AR = (uint32_t)&cmd_data[0]; 
+                DMA2_Stream2->M0AR = (uint32_t)&recv_data[0]; 
 		DMA2_Stream2->NDTR |=10;
 
                 DMA2_Stream2->CR |=DMA_SxCR_EN;  //toggle EN bit from 0 to 1
@@ -302,23 +302,26 @@ __irq void DMA2_Stream2_IRQHandler()
 }
  __irq void SPI1_IRQHandler()
  {
-  
-//   *ptr=SPI1->DR;
-// 
-//  // SPI1->CR2&=0xFFBF; //disable interrupt RXNEIE bit
-//
-//
-//if (*ptr!=0x0000)
-//{
-//  h=1;
-//  ptr++;
-//}
-//else
-//{
-//  h=0;  
-//}
-//          
-// //SPI1->CR2|= SPI_CR2_RXNEIE;
+   
+ // SPI1->CR2&=0xFFBF;
+   *ptr=SPI1->DR;
+ 
+  // SPI1->CR2&=0xFFBF; //disable interrupt RXNEIE bit
+
+
+if (*ptr!=0x0000)
+{
+   //disable interrupt RXNEIE bit
+  h=1;
+ // ptr++;
+}
+else
+{
+  h=0;
+//SPI1->CR2|= SPI_CR2_RXNEIE;  
+}
+          
+ //SPI1->CR2|= SPI_CR2_RXNEIE;
  }
  
 void main () {
@@ -385,12 +388,12 @@ NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4);
 
 //NVIC_SetPriority ( DMA2_Stream3_IRQn,4); 
 //NVIC_EnableIRQ (DMA2_Stream3_IRQn); 
+//
+//NVIC_SetPriority ( DMA2_Stream2_IRQn,4); 
+//NVIC_EnableIRQ (DMA2_Stream2_IRQn);        
 
-NVIC_SetPriority ( DMA2_Stream2_IRQn,4); 
-NVIC_EnableIRQ (DMA2_Stream2_IRQn);        
-
-//NVIC_SetPriority ( SPI1_IRQn,4); 
-//NVIC_EnableIRQ (SPI1_IRQn); 
+NVIC_SetPriority ( SPI1_IRQn,4); 
+NVIC_EnableIRQ (SPI1_IRQn); 
 
 
 	GPIOA->MODER |=set_pin_AF(5);  //SPICLK
@@ -519,20 +522,20 @@ NVIC_EnableIRQ (DMA2_Stream2_IRQn);
               DMA2_Stream2->M0AR |= (uint32_t)&recv_data[0]; 
 		DMA2_Stream2->NDTR =10;
 		//DMA DOUBLE BUFFER
-                DMA2_Stream2->CR |=DMA_SxCR_TCIE; //FUll transfer interrupt enabled
+          //      DMA2_Stream2->CR |=DMA_SxCR_TCIE; //FUll transfer interrupt enabled
 		DMA2_Stream2->CR |=(1<<11);   //Set Peripheral data size to 16bits
 		DMA2_Stream2->CR |=DMA_SxCR_PL_1; //High Priority
 		DMA2_Stream2->CR |=(3<<25); //select channel 3         
 		DMA2_Stream2->CR |=DMA_SxCR_MINC;
                 
-		//DMA2_Stream2->CR |=DMA_SxCR_CIRC; //circular mode set for SPI
+		DMA2_Stream2->CR |=DMA_SxCR_CIRC; //circular mode set for SPI
 	//	DMA2_Stream2->CR |=(1<<6); //direction
 	//      DMA2_Stream2->CR |= (1<<5) ; //[perh is flowcontroller
 		
          
                 //Emable DMA Stream for SPIRX
-                DMA2_Stream2->CR |=DMA_SxCR_EN;
-                 while (! (DMA2_Stream2->CR & DMA_SxCR_EN) ); //break out when DMA_SxCR_EN==1
+       //         DMA2_Stream2->CR |=DMA_SxCR_EN;
+      //           while (! (DMA2_Stream2->CR & DMA_SxCR_EN) ); //break out when DMA_SxCR_EN==1
 /****************************************************************************************************/                
 
          enable_int_spi();
@@ -541,20 +544,19 @@ NVIC_EnableIRQ (DMA2_Stream2_IRQn);
                 spi_cs_enable();
         			
 
-      			//resume_SPITX_DMA();
 
      //Emable DMA Stream for SPI
                DMA2_Stream3->CR |=DMA_SxCR_EN;
 
 while(1)
 {
-  if  (recv_data[0]!=0x0000) //(reset_flag==1)
+  if  (h==1) //(reset_flag==1)
   {
     flaggg++;
     unsigned int mosi_high=0;
     
        suspend_SPITX_DMA();
-       suspend_SPIRX_DMA();
+  //     suspend_SPIRX_DMA();
         spi_cs_disable();
 
    
@@ -572,29 +574,34 @@ while(1)
  
 
   }   
- ms_delay(1);
-//resume_SPIRX_DMA();
+ ms_delay(2);
 
+
+  
   
   for(mosi_high=0;mosi_high<10;mosi_high++)
   {
      while(!(SPI1->SR & SPI_SR_TXE));
     SPI1->DR=0xFFFF;  
-     while(!(SPI1->SR & SPI_SR_RXNE));
+   //  while(!(SPI1->SR & SPI_SR_RXNE));
     cmd_data[mosi_high]=SPI1->DR;
     
    ms_delay(1); //Giving 1ms for slave to prepare next CMD element
   }   
-       ms_delay(500);//1 msec   
+ 
+ 
+      // ms_delay(50);//1 msec   
             spi_cs_disable();
       
-//              spi_cs_enable();
-//     
-//         enable_int_spi();
-//
-//  resume_SPITX_DMA();
+              spi_cs_enable();
+     
+  //       enable_int_spi();
+         
+ // resume_SPIRX_DMA();
+  resume_SPITX_DMA();
+
 recv_data[0]=0x0000;
-reset_flag=0;
+//reset_flag=0;
   }
   h=0;
 }
