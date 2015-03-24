@@ -1,4 +1,5 @@
 #include <stm32f4xx.h>
+#include <command_struct.h>
 
 //Prototypes
 void ms_delay(int ms);
@@ -9,6 +10,7 @@ int set_pin_AF(int p);
 int AF_sel(int p);
 int set_ospeed(int p);
 int set_pulldir(int p);
+
 
 void suspend_SPITX_DMA(void);
 void resume_SPITX_DMA(void);
@@ -63,7 +65,7 @@ volatile int reset_flag=0;
 
  static short *ptr;
 unsigned short recv_data[10];
-unsigned short cmd_data[20];
+unsigned short recv_cmd[20];
 
 
 void enable_int_spi(void)
@@ -374,12 +376,12 @@ int i=0;
 
 	//* Enbale GPIOB clock */
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
-        
+       
 
-TIM3->PSC = 23999;	        // Set prescaler to 24 000 (PSC + 1)
-TIM3->ARR = 4000;	          // Auto reload value 1000
-TIM3->DIER |= TIM_DIER_UIE; // Enable update interrupt (timer level)
-TIM3->CR1 |= TIM_CR1_CEN;   // Enable timer
+//TIM3->PSC = 23999;	        // Set prescaler to 24 000 (PSC + 1)
+//TIM3->ARR = 4000;	          // Auto reload value 1000
+//TIM3->DIER |= TIM_DIER_UIE; // Enable update interrupt (timer level)
+//TIM3->CR1 |= TIM_CR1_CEN;   // Enable timer
          
    //      while (!(TIM3->SR & TIM_SR_UIF)); 
 
@@ -585,24 +587,21 @@ while(1)
      while(!(SPI1->SR & SPI_SR_TXE));
     SPI1->DR=0xFFFF;  
    // while(!(SPI1->SR & SPI_SR_RXNE));
-    cmd_data[mosi_high]=SPI1->DR;
+    recv_cmd[mosi_high]=SPI1->DR;
     
    ms_delay(2); //Giving 1ms for slave to prepare next CMD element
   }   
  
- 
-      // ms_delay(50);//1 msec   
+ process_cmd(&recv_cmd[1]);
+  
             spi_cs_disable();
       
               spi_cs_enable();
-     
-  //       enable_int_spi();
-         
- // resume_SPIRX_DMA();
+
   resume_SPITX_DMA();
 
 recv_data[0]=0x0000;
-//reset_flag=0;
+
   }
 h=0;
 }
