@@ -552,6 +552,7 @@ while(1)
 {
   if  (h==1) //(reset_flag==1)
   {
+    h=0;
     flaggg++;
     unsigned int mosi_high=0;
     
@@ -574,7 +575,7 @@ while(1)
  
 
   }   
- ms_delay(2);
+ ms_delay(10);
 
 
   
@@ -583,10 +584,10 @@ while(1)
   {
      while(!(SPI1->SR & SPI_SR_TXE));
     SPI1->DR=0xFFFF;  
-   //  while(!(SPI1->SR & SPI_SR_RXNE));
+   // while(!(SPI1->SR & SPI_SR_RXNE));
     cmd_data[mosi_high]=SPI1->DR;
     
-   ms_delay(1); //Giving 1ms for slave to prepare next CMD element
+   ms_delay(2); //Giving 1ms for slave to prepare next CMD element
   }   
  
  
@@ -603,7 +604,7 @@ while(1)
 recv_data[0]=0x0000;
 //reset_flag=0;
   }
-  h=0;
+h=0;
 }
 	
 
