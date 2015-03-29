@@ -46,8 +46,8 @@ void ms_delay(int ms) {
 
 //GLOBAL VARIABLES
 static short j=10;
-short adc_resultA[50];
-volatile short adc_resultB[50];
+short adc_resultA[100];
+volatile short adc_resultB[100];
 short adc_resultC[50];
 
 short test_bufA[50];
@@ -134,7 +134,7 @@ void resume_SPITX_DMA(void)
 ////                               DMA2_Stream3->M1AR = (uint32_t)&test_bufB[0]; 
 //
 //
-               DMA2_Stream3->NDTR =50;
+               DMA2_Stream3->NDTR =100;
                  saveNDTR=DMA2_Stream3->NDTR;
 
 
@@ -445,7 +445,7 @@ NVIC_EnableIRQ (SPI1_IRQn);
                 DMA2_Stream4->PAR |= (uint32_t)&ADC1->DR;
                 DMA2_Stream4->M0AR = (uint32_t)&adc_resultA[2];
               DMA2_Stream4->M1AR = (uint32_t)&adc_resultB[2];
-                DMA2_Stream4->NDTR =48; //46 readings transfer
+                DMA2_Stream4->NDTR =98; //46 readings transfer
                //DMA DOUBLE BUFFER
              DMA2_Stream4->CR |= DMA_SxCR_DBM; //Buffer switiching enabeld
        //         DMA2_Stream4->CR |=DMA_SxCR_TCIE; //full transfer interrupt enabled
@@ -492,7 +492,7 @@ NVIC_EnableIRQ (SPI1_IRQn);
                 DMA2_Stream3->M1AR |= (uint32_t)&adc_resultB[0];
 //               DMA2_Stream3->M0AR |= (uint32_t)&test_bufA[0]; 
 //               DMA2_Stream3->M1AR |= (uint32_t)&test_bufB[0];
-		DMA2_Stream3->NDTR |=50;
+		DMA2_Stream3->NDTR |=100;
 		//DMA DOUBLE BUFFER
                 DMA2_Stream3->CR |= DMA_SxCR_DBM; //Buffer switiching enabeld
         //       DMA2_Stream3->CR |=DMA_SxCR_TCIE; //FUll transfer interrupt enabled
