@@ -24,6 +24,7 @@ void spi_cs_disable(void);
 void enable_spi(void);
 void disable_spi(void);
 
+static void SystemClock_Config(void);
 
 void enable_int_spi(void);
 void disable_int_spi(void);
@@ -67,7 +68,85 @@ volatile int reset_flag=0;
 unsigned short recv_data[10];
 unsigned short recv_cmd[20];
 
+static void SystemClock_Config(void)
 
+{
+
+  RCC_ClkInitTypeDef RCC_ClkInitStruct;
+
+  RCC_OscInitTypeDef RCC_OscInitStruct;
+
+
+
+  /* Enable Power Control clock */
+
+  __PWR_CLK_ENABLE();
+
+  
+
+  /* The voltage scaling allows optimizing the power consumption when the device is 
+
+     clocked below the maximum system frequency, to update the voltage scaling value 
+
+     regarding system frequency refer to product datasheet.  */
+
+  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE2);
+
+  
+
+  /* Enable HSI Oscillator and activate PLL with HSI as source */
+
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+
+  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+
+  RCC_OscInitStruct.HSICalibrationValue = 0x10;
+
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+
+  RCC_OscInitStruct.PLL.PLLM = 16;
+
+  RCC_OscInitStruct.PLL.PLLN = 336;
+
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV4;
+
+  RCC_OscInitStruct.PLL.PLLQ = 7;
+
+  if(HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+
+  {
+
+
+
+  }
+
+ 
+
+  /* Select PLL as system clock source and configure the HCLK, PCLK1 and PCLK2 
+
+     clocks dividers */
+
+  RCC_ClkInitStruct.ClockType = (RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2);
+
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;  
+
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;  
+
+  if(HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+
+  {
+
+
+
+  }
+
+}
 void enable_int_spi(void)
 {
           SPI1->CR2|=SPI_CR2_TXDMAEN; //DMA request when TX empty flag set
@@ -85,7 +164,7 @@ void enable_spi(void)
   
   SPI1->CR1 &=0x00000000;
 	SPI1->CR1 |=SPI_CR1_DFF; //16 bit data frame
-	SPI1->CR1 |=SPI_CR1_BR_0; // Baud Rate as  fpclk/4 (21 Mhz) where fpclk is APB2 clock=84Mhz
+	SPI1->CR1 |=SPI_CR1_BR_1; // Baud Rate as  fpclk/4 (21 Mhz) where fpclk is APB2 clock=84Mhz
 
 	SPI1->CR1 |= SPI_CR1_SSM ;
 	SPI1->CR1 |= SPI_CR1_SSI;                       
@@ -327,8 +406,7 @@ else
  }
  
 void main () {
-
-
+  SystemClock_Config();
 ptr=&recv_data[0];
 int i=0;
 
