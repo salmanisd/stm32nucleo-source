@@ -24,11 +24,11 @@ void spi_cs_disable(void);
 void enable_spi(void);
 void disable_spi(void);
 
-static void SystemClock_Config(void);
 
 void enable_int_spi(void);
 void disable_int_spi(void);
 
+static void SystemClock_Config(void);
 __irq void DMA2_Stream4_IRQHandler(void);
 __irq void DMA2_Stream3_IRQHandler(void);
 __irq void DMA2_Stream2_IRQHandler(void);
@@ -47,8 +47,8 @@ void ms_delay(int ms) {
 
 //GLOBAL VARIABLES
 static short j=10;
-short adc_resultA[100];
-volatile short adc_resultB[100];
+short adc_resultA[350];
+short adc_resultB[350];
 short adc_resultC[50];
 
 short test_bufA[50];
@@ -67,7 +67,6 @@ volatile int reset_flag=0;
  static short *ptr;
 unsigned short recv_data[10];
 unsigned short recv_cmd[20];
-
 static void SystemClock_Config(void)
 
 {
@@ -85,9 +84,7 @@ static void SystemClock_Config(void)
   
 
   /* The voltage scaling allows optimizing the power consumption when the device is 
-
      clocked below the maximum system frequency, to update the voltage scaling value 
-
      regarding system frequency refer to product datasheet.  */
 
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE2);
@@ -125,7 +122,6 @@ static void SystemClock_Config(void)
  
 
   /* Select PLL as system clock source and configure the HCLK, PCLK1 and PCLK2 
-
      clocks dividers */
 
   RCC_ClkInitStruct.ClockType = (RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2);
@@ -147,6 +143,7 @@ static void SystemClock_Config(void)
   }
 
 }
+
 void enable_int_spi(void)
 {
           SPI1->CR2|=SPI_CR2_TXDMAEN; //DMA request when TX empty flag set
@@ -213,7 +210,7 @@ void resume_SPITX_DMA(void)
 ////                               DMA2_Stream3->M1AR = (uint32_t)&test_bufB[0]; 
 //
 //
-               DMA2_Stream3->NDTR =100;
+               DMA2_Stream3->NDTR =350;
                  saveNDTR=DMA2_Stream3->NDTR;
 
 
@@ -406,7 +403,8 @@ else
  }
  
 void main () {
-  SystemClock_Config();
+
+SystemClock_Config();
 ptr=&recv_data[0];
 int i=0;
 
@@ -523,7 +521,7 @@ NVIC_EnableIRQ (SPI1_IRQn);
                 DMA2_Stream4->PAR |= (uint32_t)&ADC1->DR;
                 DMA2_Stream4->M0AR = (uint32_t)&adc_resultA[2];
               DMA2_Stream4->M1AR = (uint32_t)&adc_resultB[2];
-                DMA2_Stream4->NDTR =98; //46 readings transfer
+                DMA2_Stream4->NDTR =348; //46 readings transfer
                //DMA DOUBLE BUFFER
              DMA2_Stream4->CR |= DMA_SxCR_DBM; //Buffer switiching enabeld
        //         DMA2_Stream4->CR |=DMA_SxCR_TCIE; //full transfer interrupt enabled
@@ -570,7 +568,7 @@ NVIC_EnableIRQ (SPI1_IRQn);
                 DMA2_Stream3->M1AR |= (uint32_t)&adc_resultB[0];
 //               DMA2_Stream3->M0AR |= (uint32_t)&test_bufA[0]; 
 //               DMA2_Stream3->M1AR |= (uint32_t)&test_bufB[0];
-		DMA2_Stream3->NDTR |=100;
+		DMA2_Stream3->NDTR =350;
 		//DMA DOUBLE BUFFER
                 DMA2_Stream3->CR |= DMA_SxCR_DBM; //Buffer switiching enabeld
         //       DMA2_Stream3->CR |=DMA_SxCR_TCIE; //FUll transfer interrupt enabled
