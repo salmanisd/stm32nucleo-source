@@ -47,8 +47,8 @@ void ms_delay(int ms) {
 
 //GLOBAL VARIABLES
 static short j=10;
-unsigned short adc_resultA[101];
-unsigned short adc_resultB[101];
+unsigned short adc_resultA[351];
+unsigned short adc_resultB[351];
 
 short test_bufA[50];
 short test_bufB[50];
@@ -209,7 +209,7 @@ void resume_SPITX_DMA(void)
 ////                               DMA2_Stream3->M1AR = (uint32_t)&test_bufB[0]; 
 //
 //
-               DMA2_Stream3->NDTR =101;
+               DMA2_Stream3->NDTR =351;
                  saveNDTR=DMA2_Stream3->NDTR;
 
 
@@ -357,9 +357,9 @@ __irq void DMA2_Stream4_IRQHandler()
 //	while(!(SPI1->SR & SPI_SR_RXNE));
 //spi_cs_disable();
         if ( (DMA2_Stream4->CR)&(DMA_SxCR_CT) ) //ct=adc_resultA
-             adc_resultB[100]=adc_resultB[100]+1;
+             adc_resultB[350]=adc_resultB[350]+1;
         else //ct=adc_resultB
-             adc_resultA[100]=adc_resultA[100]+1;
+             adc_resultA[350]=adc_resultA[350]+1;
 
         
         
@@ -437,11 +437,11 @@ int i=0;
 //  }
   adc_resultA[0]=0xA5A5;
   adc_resultA[1]=0xA5A5;
-   adc_resultA[100]=0;
+   adc_resultA[350]=0;
 
   adc_resultB[0]=0xB9B9;
  adc_resultB[1]=0xB9B9;
-   adc_resultB[100]=0;
+   adc_resultB[350]=0;
 
 		//APB2=No predivisor=Max Clock=84Mhz
 	//peripheral clock enable register ,enable SPI1 clock
@@ -530,7 +530,7 @@ NVIC_EnableIRQ (SPI1_IRQn);
                 DMA2_Stream4->PAR |= (uint32_t)&ADC1->DR;
                 DMA2_Stream4->M0AR = (uint32_t)&adc_resultA[2];
               DMA2_Stream4->M1AR = (uint32_t)&adc_resultB[2];
-                DMA2_Stream4->NDTR =98; //46 readings transfer
+                DMA2_Stream4->NDTR =348; //46 readings transfer
                //DMA DOUBLE BUFFER
              DMA2_Stream4->CR |= DMA_SxCR_DBM; //Buffer switiching enabeld
        //         DMA2_Stream4->CR |=DMA_SxCR_TCIE; //full transfer interrupt enabled
@@ -577,7 +577,7 @@ NVIC_EnableIRQ (SPI1_IRQn);
                 DMA2_Stream3->M1AR |= (uint32_t)&adc_resultB[0];
 //               DMA2_Stream3->M0AR |= (uint32_t)&test_bufA[0]; 
 //               DMA2_Stream3->M1AR |= (uint32_t)&test_bufB[0];
-		DMA2_Stream3->NDTR =101;
+		DMA2_Stream3->NDTR =351;
 		//DMA DOUBLE BUFFER
                 DMA2_Stream3->CR |= DMA_SxCR_DBM; //Buffer switiching enabeld
                DMA2_Stream3->CR |=DMA_SxCR_TCIE; //FUll transfer interrupt enabled
