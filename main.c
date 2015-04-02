@@ -24,11 +24,11 @@ void spi_cs_disable(void);
 void enable_spi(void);
 void disable_spi(void);
 
+static void SystemClock_Config(void);
 
 void enable_int_spi(void);
 void disable_int_spi(void);
 
-static void SystemClock_Config(void);
 __irq void DMA2_Stream4_IRQHandler(void);
 __irq void DMA2_Stream3_IRQHandler(void);
 __irq void DMA2_Stream2_IRQHandler(void);
@@ -47,9 +47,8 @@ void ms_delay(int ms) {
 
 //GLOBAL VARIABLES
 static short j=10;
-short adc_resultA[350];
-short adc_resultB[350];
-short adc_resultC[50];
+unsigned short adc_resultA[101];
+unsigned short adc_resultB[101];
 
 short test_bufA[50];
 short test_bufB[50];
@@ -67,6 +66,7 @@ volatile int reset_flag=0;
  static short *ptr;
 unsigned short recv_data[10];
 unsigned short recv_cmd[20];
+
 static void SystemClock_Config(void)
 
 {
@@ -143,7 +143,6 @@ static void SystemClock_Config(void)
   }
 
 }
-
 void enable_int_spi(void)
 {
           SPI1->CR2|=SPI_CR2_TXDMAEN; //DMA request when TX empty flag set
@@ -210,7 +209,7 @@ void resume_SPITX_DMA(void)
 ////                               DMA2_Stream3->M1AR = (uint32_t)&test_bufB[0]; 
 //
 //
-               DMA2_Stream3->NDTR =350;
+               DMA2_Stream3->NDTR =101;
                  saveNDTR=DMA2_Stream3->NDTR;
 
 
@@ -352,11 +351,18 @@ __irq void DMA2_Stream4_IRQHandler()
 {
         DMA2->LIFCR|=DMA_LIFCR_CTCIF3; //clear interrupt
         DMA2->LIFCR|=DMA_LIFCR_CHTIF3;
-        while(!(SPI1->SR & SPI_SR_TXE)); //when NDTR==0,this interrupt IRQ is called but the last word is still under transmission 
-                                         //so wait for it to complete and when TXE is set,proceed with SPIsend transmission
-  
-	while(!(SPI1->SR & SPI_SR_RXNE));
-spi_cs_disable();
+//        while(!(SPI1->SR & SPI_SR_TXE)); //when NDTR==0,this interrupt IRQ is called but the last word is still under transmission 
+//                                         //so wait for it to complete and when TXE is set,proceed with SPIsend transmission
+//  
+//	while(!(SPI1->SR & SPI_SR_RXNE));
+//spi_cs_disable();
+        if ( (DMA2_Stream4->CR)&(DMA_SxCR_CT) ) //ct=adc_resultA
+             adc_resultB[100]=adc_resultB[100]+1;
+        else //ct=adc_resultB
+             adc_resultA[100]=adc_resultA[100]+1;
+
+        
+        
 
 }
 
@@ -403,8 +409,7 @@ else
  }
  
 void main () {
-
-SystemClock_Config();
+  SystemClock_Config();
 ptr=&recv_data[0];
 int i=0;
 
@@ -432,8 +437,12 @@ int i=0;
 //  }
   adc_resultA[0]=0xA5A5;
   adc_resultA[1]=0xA5A5;
-  adc_resultB[0]=0xA5A5;
- adc_resultB[1]=0xA5A5;
+   adc_resultA[100]=0;
+
+  adc_resultB[0]=0xB9B9;
+ adc_resultB[1]=0xB9B9;
+   adc_resultB[100]=0;
+
 		//APB2=No predivisor=Max Clock=84Mhz
 	//peripheral clock enable register ,enable SPI1 clock
 	RCC->APB2ENR |=  RCC_APB2ENR_SPI1EN ; 
@@ -464,8 +473,8 @@ int i=0;
 NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4);
 
 
-//NVIC_SetPriority ( DMA2_Stream3_IRQn,4); 
-//NVIC_EnableIRQ (DMA2_Stream3_IRQn); 
+NVIC_SetPriority ( DMA2_Stream3_IRQn,4); 
+NVIC_EnableIRQ (DMA2_Stream3_IRQn); 
 //
 //NVIC_SetPriority ( DMA2_Stream2_IRQn,4); 
 //NVIC_EnableIRQ (DMA2_Stream2_IRQn);        
@@ -521,7 +530,7 @@ NVIC_EnableIRQ (SPI1_IRQn);
                 DMA2_Stream4->PAR |= (uint32_t)&ADC1->DR;
                 DMA2_Stream4->M0AR = (uint32_t)&adc_resultA[2];
               DMA2_Stream4->M1AR = (uint32_t)&adc_resultB[2];
-                DMA2_Stream4->NDTR =348; //46 readings transfer
+                DMA2_Stream4->NDTR =98; //46 readings transfer
                //DMA DOUBLE BUFFER
              DMA2_Stream4->CR |= DMA_SxCR_DBM; //Buffer switiching enabeld
        //         DMA2_Stream4->CR |=DMA_SxCR_TCIE; //full transfer interrupt enabled
@@ -568,10 +577,10 @@ NVIC_EnableIRQ (SPI1_IRQn);
                 DMA2_Stream3->M1AR |= (uint32_t)&adc_resultB[0];
 //               DMA2_Stream3->M0AR |= (uint32_t)&test_bufA[0]; 
 //               DMA2_Stream3->M1AR |= (uint32_t)&test_bufB[0];
-		DMA2_Stream3->NDTR =350;
+		DMA2_Stream3->NDTR =101;
 		//DMA DOUBLE BUFFER
                 DMA2_Stream3->CR |= DMA_SxCR_DBM; //Buffer switiching enabeld
-        //       DMA2_Stream3->CR |=DMA_SxCR_TCIE; //FUll transfer interrupt enabled
+               DMA2_Stream3->CR |=DMA_SxCR_TCIE; //FUll transfer interrupt enabled
 		DMA2_Stream3->CR |=(1<<11);   //Set Peripheral data size to 16bits
 		DMA2_Stream3->CR |=DMA_SxCR_PL_1;     //Very High prority
                 DMA2_Stream3->CR |=DMA_SxCR_PL_0; 
