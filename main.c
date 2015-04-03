@@ -356,9 +356,8 @@ __irq void DMA2_Stream4_IRQHandler()
 //  
 //	while(!(SPI1->SR & SPI_SR_RXNE));
 //spi_cs_disable();
-        if ( (DMA2_Stream4->CR)&(DMA_SxCR_CT) ) //ct=adc_resultA
              adc_resultB[350]=adc_resultB[350]+1;
-        else //ct=adc_resultB
+
              adc_resultA[350]=adc_resultA[350]+1;
 
         
