@@ -26,6 +26,7 @@ void ms_delay(int ms) {
 //GLOBAL VARIABLES
 static short j=10;
 unsigned short adc_resultA[50];
+unsigned short adc_resultB[50];
 
 static void SystemClock_Config(void)
 
@@ -125,6 +126,13 @@ static void SystemClock_Config(void)
 }
 
 
+__irq void DMA2_Stream3_IRQHandler(void)
+{
+  
+  
+  
+}
+
 	int set_pin_AF(int p)
 	{
 		p=2<<(p*2);
@@ -161,10 +169,22 @@ int i;
   {
     adc_resultA[i]=0xFF;
   }
+    for(i=0;i<50;i++)
+  {
+    adc_resultB[i]=0xAA;
+  }
+  
+  
     adc_resultA[0]=0xA5A5;
     adc_resultA[1]=0xA5A5;
   adc_resultA[48]=0xB9B9;
     adc_resultA[49]=0xB9B9;
+    
+    
+    adc_resultB[0]=0x3838;
+    adc_resultB[1]=0x3838;
+  adc_resultB[48]=0x6565;
+    adc_resultB[49]=0x6565;
   
 		//APB2=No predivisor=Max Clock=84Mhz
 	//peripheral clock enable register ,enable SPI1 clock
@@ -235,15 +255,16 @@ int i;
                 //DMA CONFIG for SPI
 		DMA2_Stream3->PAR |= (uint32_t)&SPI1->DR;
                 DMA2_Stream3->M0AR |= (uint32_t)&adc_resultA[0]; 
-		DMA2_Stream3->NDTR =50;
+              DMA2_Stream3->M1AR |= (uint32_t)&adc_resultB[0];
+		DMA2_Stream3->NDTR =100;
 		//DMA DOUBLE BUFFER
-          //      DMA2_Stream3->CR |= DMA_SxCR_DBM; //Buffer switiching enabeld
+             DMA2_Stream3->CR |= DMA_SxCR_DBM; //Buffer switiching enabeld
 //                DMA2_Stream3->CR |=DMA_SxCR_TCIE; //FUll transfer interrupt enabled
 		DMA2_Stream3->CR |=(1<<11);   //Set Peripheral data size to 16bits
 		DMA2_Stream3->CR |=(3<<16); //high prority
 		DMA2_Stream3->CR |=(3<<25); //select channel 3         
 		DMA2_Stream3->CR |=DMA_SxCR_MINC;
-		DMA2_Stream3->CR |=DMA_SxCR_CIRC; //circular mode set for SPI
+	//	DMA2_Stream3->CR |=DMA_SxCR_CIRC; //circular mode set for SPI
 		DMA2_Stream3->CR |=(1<<6); //direction
 		//      DMA2_Stream3->CR |= (1<<5) ; //[perh is flowcontroller
 		
