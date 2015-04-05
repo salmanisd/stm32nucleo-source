@@ -629,7 +629,7 @@ NVIC_EnableIRQ (SPI1_IRQn);
 	SPI1->CR1|=SPI_CR1_SPE;
                 spi_cs_enable();
         			
-
+//
 
      //Emable DMA Stream for SPI
                DMA2_Stream3->CR |=DMA_SxCR_EN;
