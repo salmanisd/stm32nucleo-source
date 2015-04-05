@@ -160,7 +160,7 @@ void enable_spi(void)
   
   SPI1->CR1 &=0x00000000;
 	SPI1->CR1 |=SPI_CR1_DFF; //16 bit data frame
-	SPI1->CR1 |=SPI_CR1_BR_1; // Baud Rate as  fpclk/4 (21 Mhz) where fpclk is APB2 clock=84Mhz
+	SPI1->CR1 |=SPI_CR1_BR_0; // Baud Rate as  fpclk/4 (21 Mhz) where fpclk is APB2 clock=84Mhz
 
 	SPI1->CR1 |= SPI_CR1_SSM ;
 	SPI1->CR1 |= SPI_CR1_SSI;                       
@@ -579,7 +579,8 @@ NVIC_EnableIRQ (SPI1_IRQn);
 		DMA2_Stream3->NDTR =702;
 		//DMA DOUBLE BUFFER
                 DMA2_Stream3->CR |= DMA_SxCR_DBM; //Buffer switiching enabeld
-               DMA2_Stream3->CR |=DMA_SxCR_TCIE; //FUll transfer interrupt enabled
+             //  DMA2_Stream3->CR |=DMA_SxCR_TCIE; //FUll transfer interrupt enabled
+             DMA2_Stream3->CR |=DMA_SxCR_HTIE;//half transfer interrupt enabled
 		DMA2_Stream3->CR |=(1<<11);   //Set Peripheral data size to 16bits
 		DMA2_Stream3->CR |=DMA_SxCR_PL_1;     //Very High prority
                 DMA2_Stream3->CR |=DMA_SxCR_PL_0; 
