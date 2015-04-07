@@ -667,14 +667,14 @@ while(1)
 
   
   
-  for(mosi_high=0;mosi_high<10;mosi_high++)
+  for(mosi_high=0;mosi_high<5;mosi_high++)
   {
      while(!(SPI1->SR & SPI_SR_TXE));
     SPI1->DR=0xFFFF;  
    // while(!(SPI1->SR & SPI_SR_RXNE));
     recv_cmd[mosi_high]=SPI1->DR;
     
-   ms_delay(2); //Giving 1ms for slave to prepare next CMD element
+   ms_delay(1); //Giving 1ms for slave to prepare next CMD element
   }   
  
  process_cmd(&recv_cmd[1]);
