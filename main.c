@@ -362,7 +362,7 @@ int i=0;
 //  {
 //    adc_resultA[i]=0xFF;
 //  }
-//  //
+//  
 
 
   adc_resultA[0]=0xA5A5;
