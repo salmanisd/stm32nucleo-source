@@ -50,7 +50,7 @@ void ms_delay(int ms) {
 
 //GLOBAL VARIABLES
 static short j=10;
-unsigned short adc_resultA[350];
+unsigned short adc_resultA[1400];
 unsigned short adc_resultB[350];
 
 
@@ -217,7 +217,7 @@ void enable_adc()
 //  ADC1->SR &=~(ADC_SR_OVR);
   DMA2_Stream4->CR |=(0<<25); //select channel 0
           DMA2_Stream4->M0AR = (uint32_t)&adc_resultA[2];
-                DMA2_Stream4->NDTR =346; //46 readings transfer
+                DMA2_Stream4->NDTR =1396; //46 readings transfer
         //Emable DMA Stream for ADC
                 DMA2_Stream4->CR |=DMA_SxCR_EN;
           
@@ -293,8 +293,8 @@ __irq void DMA2_Stream4_IRQHandler()
    
    if (DMA2->HISR & DMA_HISR_HTIF4)
    {  
+     adc_resultA[1]=adc_resultA[1]+2;
      adc_ht_done=1;
-     adc_htcnt++;
      DMA2->HIFCR=DMA_HIFCR_CHTIF4;
    }
    
@@ -302,7 +302,7 @@ __irq void DMA2_Stream4_IRQHandler()
     {
       adc_tc_done=1;
         adc_tccnt++;
-        adc_resultA[349]=adc_resultA[349]+1;
+      adc_resultA[1399]=adc_resultA[1399]+2;
       DMA2->HIFCR=DMA_HIFCR_CTCIF4;
     }
    
@@ -366,9 +366,9 @@ int i=0;
 
 
   adc_resultA[0]=0xA5A5;
-  adc_resultA[1]=0xA5A5;
-   adc_resultA[348]=0xB9B9;
-  adc_resultA[349]=0;
+  adc_resultA[1]=0;
+   adc_resultA[1398]=0xB9B9;
+  adc_resultA[1399]=1;
 
 
 		//APB2=No predivisor=Max Clock=84Mhz
@@ -448,7 +448,7 @@ NVIC_EnableIRQ (SPI1_IRQn);
    
                 DMA2_Stream4->PAR |= (uint32_t)&ADC1->DR;
                 DMA2_Stream4->M0AR = (uint32_t)&adc_resultA[2];
-                DMA2_Stream4->NDTR =346; //46 readings transfer
+                DMA2_Stream4->NDTR =1396; //46 readings transfer
          
               DMA2_Stream4->CR |=DMA_SxCR_TCIE; //full transfer interrupt enabled
                DMA2_Stream4->CR |=DMA_SxCR_HTIE;//half transfer interrupt enabled
@@ -493,7 +493,7 @@ NVIC_EnableIRQ (SPI1_IRQn);
                 //DMA CONFIG for SPI_TX
 		DMA2_Stream3->PAR |= (uint32_t)&SPI1->DR;
                DMA2_Stream3->M0AR |= (uint32_t)&adc_resultA[0]; 
-		DMA2_Stream3->NDTR =175;
+		DMA2_Stream3->NDTR =700;
                DMA2_Stream3->CR |=DMA_SxCR_TCIE; //FUll transfer interrupt enabled
       //      DMA2_Stream3->CR |=DMA_SxCR_HTIE;//half transfer interrupt enabled
 		DMA2_Stream3->CR |=(1<<11);   //Set Peripheral data size to 16bits
@@ -526,7 +526,7 @@ while(1)
       DMA2->LIFCR|=DMA_LIFCR_CTCIF3; //clear interrupt
         DMA2->LIFCR|=DMA_LIFCR_CHTIF3;
       DMA2_Stream3->M0AR = (uint32_t)&adc_resultA[0]; 
-      DMA2_Stream3->NDTR =175;
+      DMA2_Stream3->NDTR =700;
       DMA2_Stream3->CR |=DMA_SxCR_EN;
       SPI1->CR1|=SPI_CR1_SPE;
       adc_ht_done=0;
@@ -536,8 +536,8 @@ while(1)
     {
       DMA2->LIFCR|=DMA_LIFCR_CTCIF3; //clear interrupt
         DMA2->LIFCR|=DMA_LIFCR_CHTIF3;
-      DMA2_Stream3->M0AR = (uint32_t)&adc_resultA[175]; 
-      DMA2_Stream3->NDTR =175;
+      DMA2_Stream3->M0AR = (uint32_t)&adc_resultA[700]; 
+      DMA2_Stream3->NDTR =700;
       DMA2_Stream3->CR |=DMA_SxCR_EN;
       SPI1->CR1|=SPI_CR1_SPE;
       adc_tc_done=0;
